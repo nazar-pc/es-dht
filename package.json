@@ -1,0 +1,30 @@
+{
+	"name"            : "es-dht",
+	"description"     : "Generic DHT framework agnostic to command set and transport layer",
+	"keywords"        : [
+		"dht",
+		"es-dht"
+	],
+	"version"         : "",
+	"homepage"        : "https://github.com/nazar-pc/es-dht",
+	"author"          : "Nazar Mokrynskyi <nazar@mokrynskyi.com>",
+	"repository"      : {
+		"type" : "git",
+		"url"  : "git://github.com/nazar-pc/es-dht.git"
+	},
+	"license"         : "0BSD",
+	"main"            : "src/index.js",
+	"files"           : [
+		"src"
+	],
+	"scripts"         : {
+		"test" : "tape tests/**/*.js"
+	},
+	"dependencies"    : {
+		"array-map-set" : "^1.0.1"
+	},
+	"devDependencies" : {
+		"build-gc" : "^0.1.1",
+		"tape"     : "^4.9.0"
+	}
+}
