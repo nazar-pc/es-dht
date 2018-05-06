@@ -8,75 +8,125 @@
   /*
    * Implements version ? of the specification
    */
-  /**
-   * @constructor
-   *
-   * @param {number}	size
-   * @param {!Map=}	ArrayMap
-   *
-   * @return {!LRU}
-   */
-  function LRU(size, ArrayMap){
-    ArrayMap == null && (ArrayMap = new Map);
-    if (!(this instanceof LRU)) {
-      return new LRU(size);
-    }
-    this._size = size;
-    this._map = new ArrayMap;
-    this._last_key = null;
-  }
-  LRU.prototype = {
-    /**
-     * @param {!Uint8Array}			key
-     * @param {!Array<!Uint8Array>}	value
-     */
-    add: function(key, value){
-      this._map.set(key, value);
-      this._last_key = key;
-      if (this._map.size > this._size) {
-        this._map['delete'](this._map.keys().next().value);
-      }
-    }
-    /**
-     * @param {Uint8Array=}	key `null` for last key
-     *
-     * @return {!Array<!Uint8Array>}
-     */,
-    get: function(key){
-      key == null && (key = null);
-      return this._map.get(key || this._last_key);
-    }
-    /**
-     * @return {Uint8Array}
-     */,
-    last_key: function(){
-      return this._last_key;
-    }
-  };
   function Wrapper(arrayMapSet){
     var ArrayMap;
     ArrayMap = arrayMapSet['ArrayMap'];
     /**
      * @constructor
      *
-     * @param {number}	bucket_size			Size of a bucket from Kademlia design
-     * @param {number}	state_history_size	How many versions of local history will be kept
+     * @param {number}	size
+     *
+     * @return {!LRU}
+     */
+    function LRU(size){
+      if (!(this instanceof LRU)) {
+        return new LRU(size);
+      }
+      this._size = size;
+      this._map = ArrayMap();
+      this._last_key = null;
+    }
+    LRU.prototype = {
+      /**
+       * @param {!Uint8Array}			key
+       * @param {!Array<!Uint8Array>}	value
+       */
+      add: function(key, value){
+        if (this._map.has(key)) {
+          return;
+        }
+        this._map.set(key, value);
+        this._last_key = key;
+        if (this._map.size > this._size) {
+          this._map['delete'](this._map.keys().next().value);
+        }
+      }
+      /**
+       * @param {!Uint8Array}	key
+       *
+       * @return {!Array<!Uint8Array>}
+       */,
+      get: function(key){
+        return this._map.get(key);
+      }
+      /**
+       * @return {Uint8Array}
+       */,
+      last_key: function(){
+        return this._last_key;
+      }
+    };
+    /**
+     * @constructor
+     *
+     * @param {!Uint8Array}	id			Own ID
+     * @param {number}		bucket_size	Size of a bucket from Kademlia design
+     *
+     * @return {!K_bucket}
+     */
+    function K_bucket(id, bucket_size){
+      if (!(this instanceof K_bucket)) {
+        return new K_bucket(bucket_size);
+      }
+      this._id = id;
+      this._bucket_size = bucket_size;
+      this._nodes_details = ArrayMap();
+    }
+    K_bucket.prototype = {
+      /**
+       * @param {!Uint8Array}			id				Node ID
+       * @param {!Uint8Array}			state_version	Root of Merkle tree
+       * @param {!Array<!Uint8Array>}	peers			Peers of the node
+       *
+       * @return {boolean} `true` if node was added/updated or `false` otherwise
+       */
+      set: function(id, state_version, peers){}
+      /**
+       * @param {!Uint8Array} id Node ID
+       *
+       * @return {boolean}
+       */,
+      has: function(id){}
+      /**
+       * @param {!Uint8Array} id Node ID
+       */,
+      del: function(id){}
+      /**
+       * @param {!Uint8Array}	id		Node ID
+       * @param {number=}		number	How many results to return
+       *
+       * @return {!Array<!Uint8Array>} Array of node IDs closest to specified ID (`number` of nodes max)
+       */,
+      closest: function(id, number){
+        number == null && (number = Number.Number.MAX_SAFE_INTEGER);
+      }
+    };
+    /**
+     * @constructor
+     *
+     * @param {!Uint8Array}	id					Own ID
+     * @param {number}		bucket_size			Size of a bucket from Kademlia design
+     * @param {number}		state_history_size	How many versions of local history will be kept
      *
      * @return {!DHT}
      */
-    function DHT(bucket_size, state_history_size){
+    function DHT(id, bucket_size, state_history_size){
       if (!(this instanceof DHT)) {
-        return new DHT(bucket_size, state_history_size);
+        return new DHT(id, bucket_size, state_history_size);
       }
-      this._state = LRU(state_history_size, ArrayMap);
+      this._id = id;
+      this._state = LRU(state_history_size);
     }
     DHT.prototype = {
       /**
        * @param {Uint8Array=} version	Specific state version or latest if `null`
+       *
+       * @return {!Array} `[version, state]`, where `version` is a Merkle Tree root of the state
        */
       'get_state': function(version){
         version == null && (version = null);
-        return this._state.get(version);
+        version = version || this._state.last_key();
+        return [version, this._state.get(version)];
       }
     };
     Object.defineProperty(DHT.prototype, 'constructor', {
