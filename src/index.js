@@ -8,7 +8,7 @@
   /*
    * Implements version ? of the specification
    */
-  function Wrapper(arrayMapSet){
+  function Wrapper(arrayMapSet, kBucketSync){
     var ArrayMap;
     ArrayMap = arrayMapSet['ArrayMap'];
     /**
@@ -50,55 +50,20 @@
         return this._map.get(key);
       }
       /**
-       * @return {Uint8Array}
+       * @param {!Uint8Array}	key
+       */,
+      del: function(key){
+        var ref$;
+        this._map['delete'](key);
+        if (!this._map.has(this._last_key)) {
+          this._last_key = (ref$ = Array.from(this._map.keys()))[ref$.length - 1] || null;
+        }
+      }
+      /**
+       * @return {Uint8Array} `null` if there are no items
        */,
       last_key: function(){
         return this._last_key;
-      }
-    };
-    /**
-     * @constructor
-     *
-     * @param {!Uint8Array}	id			Own ID
-     * @param {number}		bucket_size	Size of a bucket from Kademlia design
-     *
-     * @return {!K_bucket}
-     */
-    function K_bucket(id, bucket_size){
-      if (!(this instanceof K_bucket)) {
-        return new K_bucket(bucket_size);
-      }
-      this._id = id;
-      this._bucket_size = bucket_size;
-      this._nodes_details = ArrayMap();
-    }
-    K_bucket.prototype = {
-      /**
-       * @param {!Uint8Array}			id				Node ID
-       * @param {!Uint8Array}			state_version	Root of Merkle tree
-       * @param {!Array<!Uint8Array>}	peers			Peers of the node
-       *
-       * @return {boolean} `true` if node was added/updated or `false` otherwise
-       */
-      set: function(id, state_version, peers){}
-      /**
-       * @param {!Uint8Array} id Node ID
-       *
-       * @return {boolean}
-       */,
-      has: function(id){}
-      /**
-       * @param {!Uint8Array} id Node ID
-       */,
-      del: function(id){}
-      /**
-       * @param {!Uint8Array}	id		Node ID
-       * @param {number=}		number	How many results to return
-       *
-       * @return {!Array<!Uint8Array>} Array of node IDs closest to specified ID (`number` of nodes max)
-       */,
-      closest: function(id, number){
-        number == null && (number = Number.Number.MAX_SAFE_INTEGER);
       }
     };
     /**
@@ -135,10 +100,10 @@
     return DHT;
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['array-map-set'], Wrapper);
+    define(['array-map-set', 'k-bucket-sync'], Wrapper);
   } else if (typeof exports === 'object') {
-    module.exports = Wrapper(require('array-map-set'));
+    module.exports = Wrapper(require('array-map-set'), require('k-bucket-sync'));
   } else {
-    this['detox_transport'] = Wrapper(this['array_map_set']);
+    this['detox_transport'] = Wrapper(this['array_map_set'], this['k_bucket_sync']);
   }
 }).call(this);
