@@ -67,17 +67,48 @@ function Wrapper (array-map-set, k-bucket-sync)
 
 		@_id	= id
 		@_state	= LRU(state_history_size)
+		@_insert_state(new Map)
 		# TODO: More stuff here
 
 	DHT:: =
 		/**
-		 * @param {Uint8Array=} version	Specific state version or latest if `null`
-		 *
-		 * @return {!Array} `[version, state]`, where `version` is a Merkle Tree root of the state
+		 * @param {!Uint8Array} id				Id of a peer
+		 * @param {!Uint8Array} state_version	State version of a peer
 		 */
-		'get_state' : (version = null) ->
-			version	= version || @_state.last_key()
-			[version, @_state.get(version)]
+		'set_peer' : (id, state_version) !->
+			state	= @'get_state'()[1]
+			state.set(id, state_version)
+			@_insert_state(state)
+		/**
+		 * @param {!Uint8Array} id Id of a peer
+		 */
+		'del_peer' : (id) !->
+			state	= @'get_state'()[1]
+			if !state.has(id)
+				return
+			state.delete(id)
+			@_insert_state(state)
+		/**
+		 * @param {Uint8Array=} state_version	Specific state version or latest if `null`
+		 *
+		 * @return {!Array} `[state_version, state]`, where `state_version` is a Merkle Tree root of the state and `state` is a `Map` with peers as keys and their state versions as values
+		 */
+		'get_state' : (state_version = null) ->
+			state_version	= state_version || @_state.last_key()
+			[state_version, ArrayMap(Array.from(@_state.get(version)))]
+		/**
+		 * @param {!Map}	new_state
+		 */
+		_insert_state : (new_state) !->
+			items			= [].concat(...Array.from(new_state))
+			items_count		= items.length
+			# We'll insert own ID at the end of the list so that total number of items will be a power of 2, but not less than once
+			# TODO: This should be in Merkle Tree implementation, only one item needs to be inserted explicitly
+			items.length	= Math.ceil(Math.log2(items_count + 1)) - items_count
+			items.fill(@_id, items_count)
+			# TODO: This function doesn't yet exists
+			state_version	= merkle-tree(items)
+			@_state.add(state_version, new_state)
 		# TODO: Many more methods
 
 	Object.defineProperty(DHT::, 'constructor', {value: DHT})

@@ -81,17 +81,52 @@
       }
       this._id = id;
       this._state = LRU(state_history_size);
+      this._insert_state(new Map);
     }
     DHT.prototype = {
       /**
-       * @param {Uint8Array=} version	Specific state version or latest if `null`
-       *
-       * @return {!Array} `[version, state]`, where `version` is a Merkle Tree root of the state
+       * @param {!Uint8Array} id				Id of a peer
+       * @param {!Uint8Array} state_version	State version of a peer
        */
-      'get_state': function(version){
-        version == null && (version = null);
-        version = version || this._state.last_key();
-        return [version, this._state.get(version)];
+      'set_peer': function(id, state_version){
+        var state;
+        state = this['get_state']()[1];
+        state.set(id, state_version);
+        this._insert_state(state);
+      }
+      /**
+       * @param {!Uint8Array} id Id of a peer
+       */,
+      'del_peer': function(id){
+        var state;
+        state = this['get_state']()[1];
+        if (!state.has(id)) {
+          return;
+        }
+        state['delete'](id);
+        this._insert_state(state);
+      }
+      /**
+       * @param {Uint8Array=} state_version	Specific state version or latest if `null`
+       *
+       * @return {!Array} `[state_version, state]`, where `state_version` is a Merkle Tree root of the state and `state` is a `Map` with peers as keys and their state versions as values
+       */,
+      'get_state': function(state_version){
+        state_version == null && (state_version = null);
+        state_version = state_version || this._state.last_key();
+        return [state_version, ArrayMap(Array.from(this._state.get(version)))];
+      }
+      /**
+       * @param {!Map}	new_state
+       */,
+      _insert_state: function(new_state){
+        var items, ref$, items_count, state_version;
+        items = (ref$ = []).concat.apply(ref$, Array.from(new_state));
+        items_count = items.length;
+        items.length = Math.ceil(Math.log2(items_count + 1)) - items_count;
+        items.fill(this._id, items_count);
+        state_version = merkleTree(items);
+        this._state.add(state_version, new_state);
       }
     };
     Object.defineProperty(DHT.prototype, 'constructor', {
