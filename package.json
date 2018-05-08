@@ -21,8 +21,9 @@
 		"test" : "tape tests/**/*.js"
 	},
 	"dependencies"    : {
-		"array-map-set" : "^1.0.1",
-		"k-bucket-sync" : "^0.1.1"
+		"array-map-set"      : "^1.0.1",
+		"k-bucket-sync"      : "^0.1.1",
+		"merkle-tree-binary" : "^0.1.0"
 	},
 	"devDependencies" : {
 		"build-gc" : "^0.1.1",

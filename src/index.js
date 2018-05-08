@@ -8,7 +8,8 @@
   /*
    * Implements version ? of the specification
    */
-  function Wrapper(arrayMapSet, kBucketSync){
+  var slice$ = [].slice, arrayFrom$ = Array.from || function(x){return slice$.call(x);};
+  function Wrapper(arrayMapSet, kBucketSync, merkleTreeBinary){
     var ArrayMap;
     ArrayMap = arrayMapSet['ArrayMap'];
     /**
@@ -70,40 +71,42 @@
      * @constructor
      *
      * @param {!Uint8Array}	id					Own ID
+     * @param {!Function}	hash_function		Hash function to be used for Merkle Tree
      * @param {number}		bucket_size			Size of a bucket from Kademlia design
      * @param {number}		state_history_size	How many versions of local history will be kept
      *
      * @return {!DHT}
      */
-    function DHT(id, bucket_size, state_history_size){
+    function DHT(id, hash_function, bucket_size, state_history_size){
       if (!(this instanceof DHT)) {
-        return new DHT(id, bucket_size, state_history_size);
+        return new DHT(id, hash_function, bucket_size, state_history_size);
       }
       this._id = id;
+      this._hash = hash_function;
       this._state = LRU(state_history_size);
       this._insert_state(new Map);
     }
     DHT.prototype = {
       /**
-       * @param {!Uint8Array} id				Id of a peer
+       * @param {!Uint8Array} peer_id			Id of a peer
        * @param {!Uint8Array} state_version	State version of a peer
        */
-      'set_peer': function(id, state_version){
+      'set_peer': function(peer_id, state_version){
         var state;
         state = this['get_state']()[1];
-        state.set(id, state_version);
+        state.set(peer_id, state_version);
         this._insert_state(state);
       }
       /**
-       * @param {!Uint8Array} id Id of a peer
+       * @param {!Uint8Array} peer_id Id of a peer
        */,
-      'del_peer': function(id){
+      'del_peer': function(peer_id){
         var state;
         state = this['get_state']()[1];
-        if (!state.has(id)) {
+        if (!state.has(peer_id)) {
           return;
         }
-        state['delete'](id);
+        state['delete'](peer_id);
         this._insert_state(state);
       }
       /**
@@ -117,15 +120,49 @@
         return [state_version, ArrayMap(Array.from(this._state.get(version)))];
       }
       /**
+       * Generate proof about peer in current state version
+       *
+       * @param {!Uint8Array} state_version	Specific state version
+       * @param {!Uint8Array} peer_id			ID of peer for which to create a proof
+       *
+       * @return {!Uint8Array}
+       */,
+      'get_state_proof': function(state_version, peer_id){
+        var state, items, ref$, proof;
+        state = this._state.get(version);
+        if (!state || !state.has(peer_id)) {
+          return new Uint8Array(0);
+        } else {
+          items = (ref$ = []).concat.apply(ref$, arrayFrom$(Array.from(new_state)).concat([this._id]));
+          return proof = merkleTreeBinary['get_proof'](items, peer_id, this._hash);
+        }
+      }
+      /**
+       * Generate proof about peer in current state version
+       *
+       * @param {!Uint8Array} peer_id			ID of peer that created proof
+       * @param {!Uint8Array} proof			Proof itself
+       * @param {!Uint8Array} target_peer_id	ID of peer's peer for which proof was generated
+       *
+       * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
+       */,
+      'check_state_proof': function(peer_id, proof, target_peer_id){
+        var state, state_version;
+        state = this['get_state']()[1];
+        state_version = state.get(peer_id);
+        if (proof[0] === 0 && merkleTreeBinary['check_proof'](state_version, proof, target_peer_id, this._hash)) {
+          return proof.subarray(1, peer_id.length + 1);
+        } else {
+          return null;
+        }
+      }
+      /**
        * @param {!Map}	new_state
        */,
       _insert_state: function(new_state){
-        var items, ref$, items_count, state_version;
-        items = (ref$ = []).concat.apply(ref$, Array.from(new_state));
-        items_count = items.length;
-        items.length = Math.ceil(Math.log2(items_count + 1)) - items_count;
-        items.fill(this._id, items_count);
-        state_version = merkleTree(items);
+        var items, ref$, state_version;
+        items = (ref$ = []).concat.apply(ref$, arrayFrom$(Array.from(new_state)).concat([this._id]));
+        state_version = merkleTreeBinary['get_root'](items, this._hash);
         this._state.add(state_version, new_state);
       }
     };
@@ -135,10 +172,10 @@
     return DHT;
   }
   if (typeof define === 'function' && define['amd']) {
-    define(['array-map-set', 'k-bucket-sync'], Wrapper);
+    define(['array-map-set', 'k-bucket-sync', 'merkle-tree-binary'], Wrapper);
   } else if (typeof exports === 'object') {
-    module.exports = Wrapper(require('array-map-set'), require('k-bucket-sync'));
+    module.exports = Wrapper(require('array-map-set'), require('k-bucket-sync'), require('merkle-tree-binary'));
   } else {
-    this['detox_transport'] = Wrapper(this['array_map_set'], this['k_bucket_sync']);
+    this['detox_transport'] = Wrapper(this['array_map_set'], this['k_bucket_sync'], this['merkle_tree_binary']);
   }
 }).call(this);
