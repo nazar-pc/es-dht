@@ -140,17 +140,18 @@
       /**
        * Generate proof about peer in current state version
        *
+       * @param {!Uint8Array} state_version	Local state version
        * @param {!Uint8Array} peer_id			ID of peer that created proof
        * @param {!Uint8Array} proof			Proof itself
        * @param {!Uint8Array} target_peer_id	ID of peer's peer for which proof was generated
        *
        * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
        */,
-      'check_state_proof': function(peer_id, proof, target_peer_id){
-        var state, state_version;
-        state = this['get_state']()[1];
-        state_version = state.get(peer_id);
-        if (proof[0] === 0 && merkleTreeBinary['check_proof'](state_version, proof, target_peer_id, this._hash)) {
+      'check_state_proof': function(state_version, peer_id, proof, target_peer_id){
+        var state, peer_state_version;
+        state = this['get_state'](state_version)[1];
+        peer_state_version = state.get(peer_id);
+        if (proof[0] === 0 && merkleTreeBinary['check_proof'](peer_state_version, proof, target_peer_id, this._hash)) {
           return proof.subarray(1, peer_id.length + 1);
         } else {
           return null;

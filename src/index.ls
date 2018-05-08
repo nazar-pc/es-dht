@@ -116,17 +116,18 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		/**
 		 * Generate proof about peer in current state version
 		 *
+		 * @param {!Uint8Array} state_version	Local state version
 		 * @param {!Uint8Array} peer_id			ID of peer that created proof
 		 * @param {!Uint8Array} proof			Proof itself
 		 * @param {!Uint8Array} target_peer_id	ID of peer's peer for which proof was generated
 		 *
 		 * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
 		 */
-		'check_state_proof' : (peer_id, proof, target_peer_id) ->
-			state			= @'get_state'()[1]
-			state_version	= state.get(peer_id)
+		'check_state_proof' : (state_version, peer_id, proof, target_peer_id) ->
+			state				= @'get_state'(state_version)[1]
+			peer_state_version	= state.get(peer_id)
 			# Correct proof will always start from `0` followed by state version, since peer ID and its state version are placed one after another in Merkle Tree
-			if proof[0] == 0 && merkle-tree-binary['check_proof'](state_version, proof, target_peer_id, @_hash)
+			if proof[0] == 0 && merkle-tree-binary['check_proof'](peer_state_version, proof, target_peer_id, @_hash)
 				proof.subarray(1, peer_id.length + 1)
 			else
 				null
