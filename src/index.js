@@ -8,7 +8,30 @@
   /*
    * Implements version ? of the specification
    */
+  /**
+   * @param {!Uint8Array}	array1
+   * @param {!Uint8Array}	array2
+   *
+   * @return {boolean}
+   */
   var slice$ = [].slice, arrayFrom$ = Array.from || function(x){return slice$.call(x);};
+  function are_arrays_equal(array1, array2){
+    var i$, len$, key, item;
+    if (array1 === array2) {
+      return true;
+    }
+    if (array1.length !== array2.length) {
+      return false;
+    }
+    for (i$ = 0, len$ = array1.length; i$ < len$; ++i$) {
+      key = i$;
+      item = array1[i$];
+      if (item !== array2[key]) {
+        return false;
+      }
+    }
+    return true;
+  }
   function Wrapper(arrayMapSet, kBucketSync, merkleTreeBinary){
     var ArrayMap;
     ArrayMap = arrayMapSet['ArrayMap'];
@@ -82,27 +105,37 @@
         return new DHT(id, hash_function, bucket_size, state_history_size);
       }
       this._id = id;
+      this._id_length = id.length;
       this._hash = hash_function;
       this._state = LRU(state_history_size);
       this._insert_state(new Map);
     }
     DHT.prototype = {
       /**
-       * @param {!Uint8Array} peer_id			Id of a peer
-       * @param {!Uint8Array} state_version	State version of a peer
+       * @param {!Uint8Array}			peer_id			Id of a peer
+       * @param {!Uint8Array}			state_version	State version of a peer
+       * @param {!Uint8Array}			proof			Proof for specified state
+       * @param {!Array<!Uint8Array>}	peers			Peer's peers that correspond to `state_version`
+       *
+       * @return {boolean} `false` if proof is not valid and was rejected
        */
-      'set_peer': function(peer_id, state_version){
-        var state;
-        state = this['get_state']()[1];
+      'set_peer': function(peer_id, state_version, proof, peers){
+        var detected_peer_id, state;
+        detected_peer_id = this._check_state_proof(state_version, proof, peer_id);
+        if (!detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)) {
+          return false;
+        }
+        state = this._get_state_copy();
         state.set(peer_id, state_version);
         this._insert_state(state);
+        true;
       }
       /**
        * @param {!Uint8Array} peer_id Id of a peer
        */,
       'del_peer': function(peer_id){
         var state;
-        state = this['get_state']()[1];
+        state = this._get_state_copy();
         if (!state.has(peer_id)) {
           return;
         }
@@ -112,12 +145,42 @@
       /**
        * @param {Uint8Array=} state_version	Specific state version or latest if `null`
        *
-       * @return {!Array} `[state_version, state]`, where `state_version` is a Merkle Tree root of the state and `state` is a `Map` with peers as keys and their state versions as values
+       * @return {Array} `[state_version, proof, peers]` or `null` if state version not found, where `state_version` is a Merkle Tree root, `proof` is a proof
+       *                 that own ID corresponds to `state_version` and `peers` is an array of peers IDs
        */,
       'get_state': function(state_version){
+        var state, proof;
+        state_version == null && (state_version = null);
+        state = this._get_state(state_version);
+        if (!state) {
+          null;
+        }
+        proof = this['get_state_proof'](state_version, this._id);
+        return [state_version, proof, Array.from(state.keys())];
+      }
+      /**
+       * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
+       *
+       * @return {Map} `null` if state is not found
+       */,
+      _get_state: function(state_version){
         state_version == null && (state_version = null);
         state_version = state_version || this._state.last_key();
-        return [state_version, ArrayMap(Array.from(this._state.get(version)))];
+        return this._state.get(state_version) || null;
+      }
+      /**
+       * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
+       *
+       * @return {Map}
+       */,
+      _get_state_copy: function(state_version){
+        var state;
+        state_version == null && (state_version = null);
+        state = this._get_state(state_version);
+        if (!state) {
+          null;
+        }
+        return ArrayMap(Array.from(state));
       }
       /**
        * Generate proof about peer in current state version
@@ -129,11 +192,11 @@
        */,
       'get_state_proof': function(state_version, peer_id){
         var state, items, ref$, proof;
-        state = this._state.get(version);
+        state = this._get_state(state_version);
         if (!state || !state.has(peer_id)) {
           return new Uint8Array(0);
         } else {
-          items = (ref$ = []).concat.apply(ref$, arrayFrom$(Array.from(new_state)).concat([this._id]));
+          items = (ref$ = []).concat.apply(ref$, arrayFrom$(Array.from(new_state)).concat([this._id, this._id]));
           return proof = merkleTreeBinary['get_proof'](items, peer_id, this._hash);
         }
       }
@@ -149,10 +212,23 @@
        */,
       'check_state_proof': function(state_version, peer_id, proof, target_peer_id){
         var state, peer_state_version;
-        state = this['get_state'](state_version)[1];
+        state = this._get_state(state_version);
+        if (!state) {
+          return null;
+        }
         peer_state_version = state.get(peer_id);
-        if (proof[0] === 0 && merkleTreeBinary['check_proof'](peer_state_version, proof, target_peer_id, this._hash)) {
-          return proof.subarray(1, peer_id.length + 1);
+        return this._check_state_proof(peer_state_version, proof, target_peer_id);
+      }
+      /**
+       * @param {!Uint8Array} state_version
+       * @param {!Uint8Array} proof
+       * @param {!Uint8Array} target_peer_id
+       *
+       * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
+       */,
+      _check_state_proof: function(state_version, proof, target_peer_id){
+        if (proof[0] === 0 && merkleTreeBinary['check_proof'](state_version, proof, target_peer_id, this._hash)) {
+          return proof.subarray(1, this._id_length + 1);
         } else {
           return null;
         }
@@ -162,7 +238,7 @@
        */,
       _insert_state: function(new_state){
         var items, ref$, state_version;
-        items = (ref$ = []).concat.apply(ref$, arrayFrom$(Array.from(new_state)).concat([this._id]));
+        items = (ref$ = []).concat.apply(ref$, arrayFrom$(Array.from(new_state)).concat([this._id, this._id]));
         state_version = merkleTreeBinary['get_root'](items, this._hash);
         this._state.add(state_version, new_state);
       }

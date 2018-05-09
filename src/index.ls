@@ -6,6 +6,21 @@
 /*
  * Implements version ? of the specification
  */
+/**
+ * @param {!Uint8Array}	array1
+ * @param {!Uint8Array}	array2
+ *
+ * @return {boolean}
+ */
+function are_arrays_equal (array1, array2)
+	if array1 == array2
+		return true
+	if array1.length != array2.length
+		return false
+	for item, key in array1
+		if item != array2[key]
+			return false
+	true
 function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 	ArrayMap	= array-map-set['ArrayMap']
 	/**
@@ -66,26 +81,38 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		if !(@ instanceof DHT)
 			return new DHT(id, hash_function, bucket_size, state_history_size)
 
-		@_id	= id
-		@_hash	= hash_function
-		@_state	= LRU(state_history_size)
+		@_id		= id
+		# All IDs and hashes will have the same length, so store it for future references
+		@_id_length	= id.length
+		@_hash		= hash_function
+		@_state		= LRU(state_history_size)
 		@_insert_state(new Map)
 		# TODO: More stuff here
 
 	DHT:: =
 		/**
-		 * @param {!Uint8Array} peer_id			Id of a peer
-		 * @param {!Uint8Array} state_version	State version of a peer
+		 * @param {!Uint8Array}			peer_id			Id of a peer
+		 * @param {!Uint8Array}			state_version	State version of a peer
+		 * @param {!Uint8Array}			proof			Proof for specified state
+		 * @param {!Array<!Uint8Array>}	peers			Peer's peers that correspond to `state_version`
+		 *
+		 * @return {boolean} `false` if proof is not valid and was rejected
 		 */
-		'set_peer' : (peer_id, state_version) !->
-			state	= @'get_state'()[1]
+		'set_peer' : (peer_id, state_version, proof, peers) !->
+			# Since peer_id is added to the end of leaves of Merkle Tree and the rest items are added in pairs, it will appear there as pair of the same elements too
+			detected_peer_id	= @_check_state_proof(state_version, proof, peer_id)
+			if !detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)
+				return false
+			state	= @_get_state_copy()
 			state.set(peer_id, state_version)
+			# TODO: Handle `peers` and search across them
 			@_insert_state(state)
+			true
 		/**
 		 * @param {!Uint8Array} peer_id Id of a peer
 		 */
 		'del_peer' : (peer_id) !->
-			state	= @'get_state'()[1]
+			state	= @_get_state_copy()
 			if !state.has(peer_id)
 				return
 			state.delete(peer_id)
@@ -93,11 +120,34 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		/**
 		 * @param {Uint8Array=} state_version	Specific state version or latest if `null`
 		 *
-		 * @return {!Array} `[state_version, state]`, where `state_version` is a Merkle Tree root of the state and `state` is a `Map` with peers as keys and their state versions as values
+		 * @return {Array} `[state_version, proof, peers]` or `null` if state version not found, where `state_version` is a Merkle Tree root, `proof` is a proof
+		 *                 that own ID corresponds to `state_version` and `peers` is an array of peers IDs
 		 */
 		'get_state' : (state_version = null) ->
+			state	= @_get_state(state_version)
+			if !state
+				null
+			# Get proof that own ID is in this state version
+			proof	= @'get_state_proof'(state_version, @_id)
+			[state_version, proof, Array.from(state.keys())]
+		/**
+		 * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
+		 *
+		 * @return {Map} `null` if state is not found
+		 */
+		_get_state : (state_version = null) ->
 			state_version	= state_version || @_state.last_key()
-			[state_version, ArrayMap(Array.from(@_state.get(version)))]
+			@_state.get(state_version) || null
+		/**
+		 * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
+		 *
+		 * @return {Map}
+		 */
+		_get_state_copy : (state_version = null) ->
+			state	= @_get_state(state_version)
+			if !state
+				null
+			ArrayMap(Array.from(state))
 		/**
 		 * Generate proof about peer in current state version
 		 *
@@ -107,11 +157,12 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @return {!Uint8Array}
 		 */
 		'get_state_proof' : (state_version, peer_id) ->
-			state	= @_state.get(version)
+			state	= @_get_state(state_version)
 			if !state || !state.has(peer_id)
 				new Uint8Array(0)
 			else
-				items	= [].concat(...Array.from(new_state), @_id)
+				# Add own ID twice; this will not affect Merkle Tree root (if there are some peers already), but will allow us to check proof in `set_peer` method
+				items	= [].concat(...Array.from(new_state), @_id, @_id)
 				proof	= merkle-tree-binary['get_proof'](items, peer_id, @_hash)
 		/**
 		 * Generate proof about peer in current state version
@@ -124,18 +175,29 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
 		 */
 		'check_state_proof' : (state_version, peer_id, proof, target_peer_id) ->
-			state				= @'get_state'(state_version)[1]
+			state	= @_get_state(state_version)
+			if !state
+				return null
 			peer_state_version	= state.get(peer_id)
+			@_check_state_proof(peer_state_version, proof, target_peer_id)
+		/**
+		 * @param {!Uint8Array} state_version
+		 * @param {!Uint8Array} proof
+		 * @param {!Uint8Array} target_peer_id
+		 *
+		 * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
+		 */
+		_check_state_proof : (state_version, proof, target_peer_id) ->
 			# Correct proof will always start from `0` followed by state version, since peer ID and its state version are placed one after another in Merkle Tree
-			if proof[0] == 0 && merkle-tree-binary['check_proof'](peer_state_version, proof, target_peer_id, @_hash)
-				proof.subarray(1, peer_id.length + 1)
+			if proof[0] == 0 && merkle-tree-binary['check_proof'](state_version, proof, target_peer_id, @_hash)
+				proof.subarray(1, @_id_length + 1)
 			else
 				null
 		/**
 		 * @param {!Map}	new_state
 		 */
 		_insert_state : (new_state) !->
-			items			= [].concat(...Array.from(new_state), @_id)
+			items			= [].concat(...Array.from(new_state), @_id, @_id)
 			state_version	= merkle-tree-binary['get_root'](items, @_hash)
 			@_state.add(state_version, new_state)
 		# TODO: Many more methods
