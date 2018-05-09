@@ -109,6 +109,7 @@
       this._hash = hash_function;
       this._state = LRU(state_history_size);
       this._insert_state(new Map);
+      this._peers = kBucketSync(this._id, bucket_size);
     }
     DHT.prototype = {
       /**
@@ -117,12 +118,17 @@
        * @param {!Uint8Array}			proof			Proof for specified state
        * @param {!Array<!Uint8Array>}	peers			Peer's peers that correspond to `state_version`
        *
-       * @return {boolean} `false` if proof is not valid and was rejected
+       * @return {boolean} `false` if proof is not valid or if a bucket that corresponds to this peer is already full
        */
       'set_peer': function(peer_id, state_version, proof, peers){
-        var detected_peer_id, state;
+        var detected_peer_id, old_peers, new_peers, state;
         detected_peer_id = this._check_state_proof(state_version, proof, peer_id);
         if (!detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)) {
+          return false;
+        }
+        old_peers = this._peers.get_data(peer_id) || new Set;
+        new_peers = ArraySet(peers);
+        if (!this._peers.set(peer_id, new_peers)) {
           return false;
         }
         state = this._get_state_copy();
@@ -139,6 +145,7 @@
         if (!state.has(peer_id)) {
           return;
         }
+        this._peers['delete'](peer_id);
         state['delete'](peer_id);
         this._insert_state(state);
       }

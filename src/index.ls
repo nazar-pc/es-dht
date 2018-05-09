@@ -87,6 +87,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		@_hash		= hash_function
 		@_state		= LRU(state_history_size)
 		@_insert_state(new Map)
+		@_peers		= k-bucket-sync(@_id, bucket_size)
 		# TODO: More stuff here
 
 	DHT:: =
@@ -96,16 +97,20 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @param {!Uint8Array}			proof			Proof for specified state
 		 * @param {!Array<!Uint8Array>}	peers			Peer's peers that correspond to `state_version`
 		 *
-		 * @return {boolean} `false` if proof is not valid and was rejected
+		 * @return {boolean} `false` if proof is not valid or if a bucket that corresponds to this peer is already full
 		 */
 		'set_peer' : (peer_id, state_version, proof, peers) !->
 			# Since peer_id is added to the end of leaves of Merkle Tree and the rest items are added in pairs, it will appear there as pair of the same elements too
 			detected_peer_id	= @_check_state_proof(state_version, proof, peer_id)
 			if !detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)
 				return false
+			old_peers	= @_peers.get_data(peer_id) || new Set
+			new_peers	= ArraySet(peers)
+			if !@_peers.set(peer_id, new_peers)
+				return false
+			# TODO: handle peers diff
 			state	= @_get_state_copy()
 			state.set(peer_id, state_version)
-			# TODO: Handle `peers` and search across them
 			@_insert_state(state)
 			true
 		/**
@@ -115,6 +120,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			state	= @_get_state_copy()
 			if !state.has(peer_id)
 				return
+			@_peers.delete(peer_id)
 			state.delete(peer_id)
 			@_insert_state(state)
 		/**
