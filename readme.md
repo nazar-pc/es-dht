@@ -1,7 +1,7 @@
 # Entangled state DHT (ES-DHT)
 Generic DHT framework agnostic to command set and transport layer.
 
-This repository contains high level design overview (design.md, not written yet), specification for implementors (spec.md, not written yet) and reference implementation (not written yet).
+This repository contains high level design overview (design.md, not written yet), specification for implementors (spec.md, not written yet) and reference implementation.
 
 WARNING: INSECURE UNTIL PROVEN THE OPPOSITE!!!
 
