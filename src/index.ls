@@ -23,6 +23,7 @@ function are_arrays_equal (array1, array2)
 	true
 function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 	ArrayMap	= array-map-set['ArrayMap']
+	ArraySet	= array-map-set['ArraySet']
 	/**
 	 * @constructor
 	 *
@@ -98,41 +99,84 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @param {!Uint8Array}	id		ID if the node being searched for
 		 * @param {number=}		number	Number of nodes to be returned if exact match was not found, defaults to bucket size
 		 *
-		 * @return {!<Array<!Array<!Uint8Array>>>}
+		 * @return {!Array<!Array<!Uint8Array>>} Array of items, each item is an array of `Uint8Array`s `[node_id, parent_peer_id, parent_peer_state_version]`
 		 */
 		'start_lookup' : (id, number = @_bucket_size) ->
 			# TODO: Be ready that `id` is our peer already
 			bucket		= k-bucket-sync(id, number)
-			known_nodes	= ArrayMap()
-			@_get_state().forEach ([state_version, peer_peers], peer_id) !->
+			parents		= ArrayMap()
+			state		= @_get_state()
+			state.forEach ([state_version, peer_peers], peer_id) !->
 				bucket.set(peer_id)
-				known_nodes.set(peer_id, ArraySet([peer_id, state_version]))
-				peer_peers.forEach (peer_peer_id) !->
-					bucket.set(peer_peer_id)
-					parents	= known_nodes.get(peer_peer_id) || ArraySet()
-					parents.add(peer_id)
-					known_nodes.set(peer_peer_id, parents)
-			closest_so_far		= bucket['closest'](id, number)
-			nodes_to_connect_to	= []
-			for node_id in closest_so_far
-				if !@_peers.has(node_id)
-					parent_peer_id				= known_nodes.get(node_id)[0]
-					parent_peer_state_version	= known_nodes.get(peer_peer_id)[1]
-					nodes_to_connect_to.push([node_id, parent_peer_id, parent_peer_state_version])
-			@_lookups.set(id, {known_nodes, bucket})
+				for peer_peer_id in peer_peers
+					if !parents.has(peer_peer_id) && bucket.set(peer_peer_id)
+						parents.set(peer_peer_id, peer_id)
+			# TODO: Somehow limit impact if one node has too many peers and occupy all of the closest nodes, effectively controlling lookup
+			closest_so_far			= bucket['closest'](id, number)
+			nodes_to_connect_to		= []
+			connections_awaiting	= ArraySet()
+			for closest_node_id in closest_so_far
+				parent_peer_id	= parents.get(closest_node_id)
+				if parent_peer_id
+					parent_peer_state_version	= state.get(parent_peer_id)
+					nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version])
+					connections_awaiting.add(closest_node_id)
+			@_lookups.set(id, [connections_awaiting, bucket, number])
 			nodes_to_connect_to
 		/**
-		 * @param {!Uint8Array} id Same as in `start_lookup()`
+		 * @param {!Uint8Array}			id					The same as in `start_lookup()`
+		 * @param {!Uint8Array}			node_id				As returned by `start_lookup()`
+		 * @param {!Uint8Array}			node_state_version	State of `node_id` that corresponds to `parent_peer_state_version`
+		 * @param {Array<!Uint8Array>}	node_peers			Peers of `node_id` at state `node_state_version` or `null` if connection to `node_id` have failed
+		 *
+		 * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
 		 */
-		'update_lookup' : (id) !->
+		'update_lookup' : (id, node_id, node_state_version, node_peers) !->
+			lookup	= @_lookups.get(id)
+			if !lookup
+				return []
+			[connections_awaiting, bucket, number]	= lookup
+			connections_awaiting.delete(node_id)
+			if !node_peers
+				bucket.del(node_id)
+				return []
+			added_nodes	= ArraySet()
+			for node_peer_id in node_peers
+				if !bucket.has(node_peer_id) && bucket.set(node_peer_id)
+					added_nodes.add(node_peer_id)
+			closest_so_far		= bucket['closest'](id, number)
+			nodes_to_connect_to	= []
+			for closest_node_id in closest_so_far
+				if added_nodes.has(closest_node_id)
+					nodes_to_connect_to.push([closest_node_id, node_id, node_state_version])
+					connections_awaiting.add(closest_node_id)
+			nodes_to_connect_to
 		/**
-		 * @param {!Uint8Array} id Same as in `start_lookup()`
+		 * @param {!Uint8Array} id The same as in `start_lookup()`
+		 *
+		 * @return {boolean}
 		 */
-		'is_lookup_finished' : (id) !->
+		'is_lookup_finished' : (id) ->
+			lookup	= @_lookups.get(id)
+			if !lookup
+				true
+			else
+				[connections_awaiting] = lookup
+				connections_awaiting.size == 0
 		/**
-		 * @param {!Uint8Array} id Same as in `start_lookup()`
+		 * @param {!Uint8Array} id The same as in `start_lookup()`
+		 *
+		 * @return {Array<!Uint8Array>} `[id]` if node with specified ID was connected directly, an array of closest IDs if exact node wasn't found and `null` otherwise
 		 */
-		'get_lookup_result' : (id) !->
+		'get_lookup_result' : (id) ->
+			lookup	= @_lookups.get(id)
+			@_lookups.delete(id)
+			if !lookup
+				null
+			[, bucket, number]	= lookup
+			if @_peers.has(id)
+				return [id]
+			bucket['closest'](id, number)
 		/**
 		 * @param {!Uint8Array}			peer_id				Id of a peer
 		 * @param {!Uint8Array}			peer_state_version	State version of a peer
@@ -149,7 +193,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			if !@_peers.set(peer_id)
 				return false
 			state	= @_get_state_copy()
-			state.set(peer_id, [peer_state_version, ArraySet(peer_peers)])
+			state.set(peer_id, [peer_state_version, peer_peers])
 			@_insert_state(state)
 			true
 		/**
@@ -165,8 +209,8 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		/**
 		 * @param {Uint8Array=} state_version	Specific state version or latest if `null`
 		 *
-		 * @return {Array} `[state_version, proof, peer_peers]` or `null` if state version not found, where `state_version` is a Merkle Tree root, `proof` is a proof
-		 *                 that own ID corresponds to `state_version` and `peer_peers` is an array of peer's peers IDs
+		 * @return {Array} `[state_version, proof, peers]` or `null` if state version not found, where `state_version` is a Merkle Tree root, `proof` is a proof
+		 *                 that own ID corresponds to `state_version` and `peers` is an array of peers IDs
 		 */
 		'get_state' : (state_version = null) ->
 			state	= @_get_state(state_version)

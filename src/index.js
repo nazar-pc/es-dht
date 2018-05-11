@@ -32,8 +32,9 @@
     return true;
   }
   function Wrapper(arrayMapSet, kBucketSync, merkleTreeBinary){
-    var ArrayMap;
+    var ArrayMap, ArraySet;
     ArrayMap = arrayMapSet['ArrayMap'];
+    ArraySet = arrayMapSet['ArraySet'];
     /**
      * @constructor
      *
@@ -119,54 +120,111 @@
        * @param {!Uint8Array}	id		ID if the node being searched for
        * @param {number=}		number	Number of nodes to be returned if exact match was not found, defaults to bucket size
        *
-       * @return {!<Array<!Array<!Uint8Array>>>}
+       * @return {!Array<!Array<!Uint8Array>>} Array of items, each item is an array of `Uint8Array`s `[node_id, parent_peer_id, parent_peer_state_version]`
        */
       'start_lookup': function(id, number){
-        var bucket, known_nodes, closest_so_far, nodes_to_connect_to, i$, len$, node_id, parent_peer_id, parent_peer_state_version;
+        var bucket, parents, state, closest_so_far, nodes_to_connect_to, connections_awaiting, i$, len$, closest_node_id, parent_peer_id, parent_peer_state_version;
         number == null && (number = this._bucket_size);
         bucket = kBucketSync(id, number);
-        known_nodes = ArrayMap();
-        this._get_state().forEach(function(arg$, peer_id){
-          var state_version, peer_peers;
+        parents = ArrayMap();
+        state = this._get_state();
+        state.forEach(function(arg$, peer_id){
+          var state_version, peer_peers, i$, len$, peer_peer_id;
           state_version = arg$[0], peer_peers = arg$[1];
           bucket.set(peer_id);
-          known_nodes.set(peer_id, ArraySet([peer_id, state_version]));
-          peer_peers.forEach(function(peer_peer_id){
-            var parents;
-            bucket.set(peer_peer_id);
-            parents = known_nodes.get(peer_peer_id) || ArraySet();
-            parents.add(peer_id);
-            known_nodes.set(peer_peer_id, parents);
-          });
+          for (i$ = 0, len$ = peer_peers.length; i$ < len$; ++i$) {
+            peer_peer_id = peer_peers[i$];
+            if (!parents.has(peer_peer_id) && bucket.set(peer_peer_id)) {
+              parents.set(peer_peer_id, peer_id);
+            }
+          }
         });
         closest_so_far = bucket['closest'](id, number);
         nodes_to_connect_to = [];
+        connections_awaiting = ArraySet();
         for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
-          node_id = closest_so_far[i$];
-          if (!this._peers.has(node_id)) {
-            parent_peer_id = known_nodes.get(node_id)[0];
-            parent_peer_state_version = known_nodes.get(peer_peer_id)[1];
-            nodes_to_connect_to.push([node_id, parent_peer_id, parent_peer_state_version]);
+          closest_node_id = closest_so_far[i$];
+          parent_peer_id = parents.get(closest_node_id);
+          if (parent_peer_id) {
+            parent_peer_state_version = state.get(parent_peer_id);
+            nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version]);
+            connections_awaiting.add(closest_node_id);
           }
         }
-        this._lookups.set(id, {
-          known_nodes: known_nodes,
-          bucket: bucket
-        });
+        this._lookups.set(id, [connections_awaiting, bucket, number]);
         return nodes_to_connect_to;
       }
       /**
-       * @param {!Uint8Array} id Same as in `start_lookup()`
+       * @param {!Uint8Array}			id					The same as in `start_lookup()`
+       * @param {!Uint8Array}			node_id				As returned by `start_lookup()`
+       * @param {!Uint8Array}			node_state_version	State of `node_id` that corresponds to `parent_peer_state_version`
+       * @param {Array<!Uint8Array>}	node_peers			Peers of `node_id` at state `node_state_version` or `null` if connection to `node_id` have failed
+       *
+       * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
        */,
-      'update_lookup': function(id){}
+      'update_lookup': function(id, node_id, node_state_version, node_peers){
+        var lookup, connections_awaiting, bucket, number, added_nodes, i$, len$, node_peer_id, closest_so_far, nodes_to_connect_to, closest_node_id;
+        lookup = this._lookups.get(id);
+        if (!lookup) {
+          return [];
+        }
+        connections_awaiting = lookup[0], bucket = lookup[1], number = lookup[2];
+        connections_awaiting['delete'](node_id);
+        if (!node_peers) {
+          bucket.del(node_id);
+          return [];
+        }
+        added_nodes = ArraySet();
+        for (i$ = 0, len$ = node_peers.length; i$ < len$; ++i$) {
+          node_peer_id = node_peers[i$];
+          if (!bucket.has(node_peer_id) && bucket.set(node_peer_id)) {
+            added_nodes.add(node_peer_id);
+          }
+        }
+        closest_so_far = bucket['closest'](id, number);
+        nodes_to_connect_to = [];
+        for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
+          closest_node_id = closest_so_far[i$];
+          if (added_nodes.has(closest_node_id)) {
+            nodes_to_connect_to.push([closest_node_id, node_id, node_state_version]);
+            connections_awaiting.add(closest_node_id);
+          }
+        }
+        nodes_to_connect_to;
+      }
       /**
-       * @param {!Uint8Array} id Same as in `start_lookup()`
+       * @param {!Uint8Array} id The same as in `start_lookup()`
+       *
+       * @return {boolean}
        */,
-      'is_lookup_finished': function(id){}
+      'is_lookup_finished': function(id){
+        var lookup, connections_awaiting;
+        lookup = this._lookups.get(id);
+        if (!lookup) {
+          return true;
+        } else {
+          connections_awaiting = lookup[0];
+          return connections_awaiting.size === 0;
+        }
+      }
       /**
-       * @param {!Uint8Array} id Same as in `start_lookup()`
+       * @param {!Uint8Array} id The same as in `start_lookup()`
+       *
+       * @return {Array<!Uint8Array>} `[id]` if node with specified ID was connected directly, an array of closest IDs if exact node wasn't found and `null` otherwise
        */,
-      'get_lookup_result': function(id){}
+      'get_lookup_result': function(id){
+        var lookup, bucket, number;
+        lookup = this._lookups.get(id);
+        this._lookups['delete'](id);
+        if (!lookup) {
+          null;
+        }
+        bucket = lookup[1], number = lookup[2];
+        if (this._peers.has(id)) {
+          return [id];
+        }
+        return bucket['closest'](id, number);
+      }
       /**
        * @param {!Uint8Array}			peer_id				Id of a peer
        * @param {!Uint8Array}			peer_state_version	State version of a peer
@@ -185,7 +243,7 @@
           return false;
         }
         state = this._get_state_copy();
-        state.set(peer_id, [peer_state_version, ArraySet(peer_peers)]);
+        state.set(peer_id, [peer_state_version, peer_peers]);
         this._insert_state(state);
         true;
       }
@@ -205,8 +263,8 @@
       /**
        * @param {Uint8Array=} state_version	Specific state version or latest if `null`
        *
-       * @return {Array} `[state_version, proof, peer_peers]` or `null` if state version not found, where `state_version` is a Merkle Tree root, `proof` is a proof
-       *                 that own ID corresponds to `state_version` and `peer_peers` is an array of peer's peers IDs
+       * @return {Array} `[state_version, proof, peers]` or `null` if state version not found, where `state_version` is a Merkle Tree root, `proof` is a proof
+       *                 that own ID corresponds to `state_version` and `peers` is an array of peers IDs
        */,
       'get_state': function(state_version){
         var state, proof;
