@@ -121,14 +121,12 @@
        * @return {boolean} `false` if proof is not valid or if a bucket that corresponds to this peer is already full
        */
       'set_peer': function(peer_id, state_version, proof, peers){
-        var detected_peer_id, old_peers, new_peers, state;
+        var detected_peer_id, state;
         detected_peer_id = this._check_state_proof(state_version, proof, peer_id);
         if (!detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)) {
           return false;
         }
-        old_peers = this._peers.get_data(peer_id) || new Set;
-        new_peers = ArraySet(peers);
-        if (!this._peers.set(peer_id, new_peers)) {
+        if (!this._peers.set(peer_id, ArraySet(peers))) {
           return false;
         }
         state = this._get_state_copy();

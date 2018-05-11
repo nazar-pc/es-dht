@@ -104,9 +104,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			detected_peer_id	= @_check_state_proof(state_version, proof, peer_id)
 			if !detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)
 				return false
-			old_peers	= @_peers.get_data(peer_id) || new Set
-			new_peers	= ArraySet(peers)
-			if !@_peers.set(peer_id, new_peers)
+			if !@_peers.set(peer_id, ArraySet(peers))
 				return false
 			# TODO: handle peers diff
 			state	= @_get_state_copy()
