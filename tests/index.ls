@@ -28,13 +28,6 @@ instances	= ArrayMap()
 		if state
 			[state_version, proof, peers]	= state
 			@_dht.set_peer(bootstrap_node_id, state_version, proof, peers)
-#	@_interval = setInterval (!~>
-#		@lookup(random_bytes(20))
-#		state							= @_dht.get_state()
-#		[state_version, proof, peers]	= state
-#		for peer in peers
-#			@_request(peer, 'put_state', state)
-#	), 20
 Simple_DHT:: =
 	lookup : (id) ->
 		@_handle_lookup(@_dht.start_lookup(id))
