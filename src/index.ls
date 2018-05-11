@@ -155,18 +155,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		/**
 		 * @param {!Uint8Array} id The same as in `start_lookup()`
 		 *
-		 * @return {boolean}
-		 */
-		'is_lookup_finished' : (id) ->
-			lookup	= @_lookups.get(id)
-			if !lookup
-				true
-			else
-				[connections_awaiting] = lookup
-				connections_awaiting.size == 0
-		/**
-		 * @param {!Uint8Array} id The same as in `start_lookup()`
-		 *
 		 * @return {Array<!Uint8Array>} `[id]` if node with specified ID was connected directly, an array of closest IDs if exact node wasn't found and `null` otherwise
 		 */
 		'finish_lookup' : (id) ->
@@ -214,7 +202,8 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 *                 that own ID corresponds to `state_version` and `peers` is an array of peers IDs
 		 */
 		'get_state' : (state_version = null) ->
-			state	= @_get_state(state_version)
+			state_version	= state_version || @_state.last_key()
+			state			= @_get_state(state_version)
 			if !state
 				null
 			# Get proof that own ID is in this state version
@@ -248,7 +237,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 */
 		'get_state_proof' : (state_version, peer_id) ->
 			state	= @_get_state(state_version)
-			if !state || !state.has(peer_id)
+			if !state || (!state.has(peer_id) && !are_arrays_equal(peer_id, @_id))
 				new Uint8Array(0)
 			else
 				items	= @_reduce_state_to_proof_items(state)
@@ -258,10 +247,10 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 *
 		 * @return {!Array<!Uint8Array>}
 		 */
-		_reduce_state_to_proof_items : (state) !->
+		_reduce_state_to_proof_items : (state) ->
 			items	= []
 			state.forEach ([peer_state_version], peer_id) !->
-				items.push(peer_id, state_version)
+				items.push(peer_id, peer_state_version)
 			# Add own ID twice; this will not affect Merkle Tree root (if there are some peers already), but will allow us to check proof in `set_peer` method
 			items.push(@_id, @_id)
 			items

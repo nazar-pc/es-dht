@@ -198,21 +198,6 @@
       /**
        * @param {!Uint8Array} id The same as in `start_lookup()`
        *
-       * @return {boolean}
-       */,
-      'is_lookup_finished': function(id){
-        var lookup, connections_awaiting;
-        lookup = this._lookups.get(id);
-        if (!lookup) {
-          return true;
-        } else {
-          connections_awaiting = lookup[0];
-          return connections_awaiting.size === 0;
-        }
-      }
-      /**
-       * @param {!Uint8Array} id The same as in `start_lookup()`
-       *
        * @return {Array<!Uint8Array>} `[id]` if node with specified ID was connected directly, an array of closest IDs if exact node wasn't found and `null` otherwise
        */,
       'finish_lookup': function(id){
@@ -272,6 +257,7 @@
       'get_state': function(state_version){
         var state, proof;
         state_version == null && (state_version = null);
+        state_version = state_version || this._state.last_key();
         state = this._get_state(state_version);
         if (!state) {
           null;
@@ -314,7 +300,7 @@
       'get_state_proof': function(state_version, peer_id){
         var state, items, proof;
         state = this._get_state(state_version);
-        if (!state || !state.has(peer_id)) {
+        if (!state || (!state.has(peer_id) && !are_arrays_equal(peer_id, this._id))) {
           return new Uint8Array(0);
         } else {
           items = this._reduce_state_to_proof_items(state);
@@ -332,10 +318,10 @@
         state.forEach(function(arg$, peer_id){
           var peer_state_version;
           peer_state_version = arg$[0];
-          items.push(peer_id, state_version);
+          items.push(peer_id, peer_state_version);
         });
         items.push(this._id, this._id);
-        items;
+        return items;
       }
       /**
        * Generate proof about peer in current state version
