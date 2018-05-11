@@ -86,6 +86,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		@_id			= id
 		# All IDs and hashes will have the same length, so store it for future references
 		@_id_length		= id.length
+		@_bucket_size	= bucket_size
 		@_hash			= hash_function
 		@_state			= LRU(state_history_size)
 		@_peers			= k-bucket-sync(@_id, bucket_size)
@@ -174,7 +175,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 *
 		 * @return {boolean} `false` if proof is not valid or if a bucket that corresponds to this peer is already full
 		 */
-		'set_peer' : (peer_id, peer_state_version, proof, peer_peers) !->
+		'set_peer' : (peer_id, peer_state_version, proof, peer_peers) ->
 			# Since peer_id is added to the end of leaves of Merkle Tree and the rest items are added in pairs, it will appear there as pair of the same elements too
 			detected_peer_id	= @_check_state_proof(peer_state_version, proof, peer_id)
 			if !detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)

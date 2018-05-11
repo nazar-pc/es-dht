@@ -1,4 +1,4 @@
-# Entangled state DHT (ES-DHT)
+# Entangled state DHT (ES-DHT) [![Travis CI](https://img.shields.io/travis/nazar-pc/es-dht/master.svg?label=Travis%20CI)](https://travis-ci.org/nazar-pc/es-dht)
 Generic DHT framework agnostic to command set and transport layer.
 
 This repository contains high level design overview (design.md, not written yet), specification for implementors (spec.md, not written yet) and reference implementation.

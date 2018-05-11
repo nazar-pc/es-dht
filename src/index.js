@@ -109,6 +109,7 @@
       }
       this._id = id;
       this._id_length = id.length;
+      this._bucket_size = bucket_size;
       this._hash = hash_function;
       this._state = LRU(state_history_size);
       this._peers = kBucketSync(this._id, bucket_size);
@@ -233,7 +234,7 @@
         state = this._get_state_copy();
         state.set(peer_id, [peer_state_version, peer_peers]);
         this._insert_state(state);
-        true;
+        return true;
       }
       /**
        * @param {!Uint8Array} peer_id Id of a peer
