@@ -125,6 +125,9 @@
       'start_lookup': function(id, number){
         var bucket, parents, state, closest_so_far, nodes_to_connect_to, connections_awaiting, i$, len$, closest_node_id, parent_peer_id, parent_peer_state_version;
         number == null && (number = this._bucket_size);
+        if (this._peers.has(id)) {
+          return [];
+        }
         bucket = kBucketSync(id, number);
         parents = ArrayMap();
         state = this._get_state();
@@ -212,17 +215,17 @@
        *
        * @return {Array<!Uint8Array>} `[id]` if node with specified ID was connected directly, an array of closest IDs if exact node wasn't found and `null` otherwise
        */,
-      'get_lookup_result': function(id){
+      'finish_lookup': function(id){
         var lookup, bucket, number;
         lookup = this._lookups.get(id);
         this._lookups['delete'](id);
-        if (!lookup) {
-          null;
-        }
-        bucket = lookup[1], number = lookup[2];
         if (this._peers.has(id)) {
           return [id];
         }
+        if (!lookup) {
+          return null;
+        }
+        bucket = lookup[1], number = lookup[2];
         return bucket['closest'](id, number);
       }
       /**

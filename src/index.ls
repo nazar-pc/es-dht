@@ -102,7 +102,8 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @return {!Array<!Array<!Uint8Array>>} Array of items, each item is an array of `Uint8Array`s `[node_id, parent_peer_id, parent_peer_state_version]`
 		 */
 		'start_lookup' : (id, number = @_bucket_size) ->
-			# TODO: Be ready that `id` is our peer already
+			if @_peers.has(id)
+				return []
 			bucket		= k-bucket-sync(id, number)
 			parents		= ArrayMap()
 			state		= @_get_state()
@@ -168,14 +169,14 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 *
 		 * @return {Array<!Uint8Array>} `[id]` if node with specified ID was connected directly, an array of closest IDs if exact node wasn't found and `null` otherwise
 		 */
-		'get_lookup_result' : (id) ->
+		'finish_lookup' : (id) ->
 			lookup	= @_lookups.get(id)
 			@_lookups.delete(id)
-			if !lookup
-				null
-			[, bucket, number]	= lookup
 			if @_peers.has(id)
 				return [id]
+			if !lookup
+				return null
+			[, bucket, number]	= lookup
 			bucket['closest'](id, number)
 		/**
 		 * @param {!Uint8Array}			peer_id				Id of a peer
