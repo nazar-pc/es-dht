@@ -44,7 +44,7 @@ Lookup is proceeded in rounds, each round may contain multiple parallel queries.
 
 First, empty k-bucket is created and filled with all of the nodes known (both peers and their peers).
 
-In each round specified number of nodes is selected from k-bucket that are closest to target ID.
+In each round specified number of nodes (defaults to `k`, but may be increased/decreased) is selected from k-bucket that are closest to target ID.
 If node that is not yet connected (not a peer in the first round) appear in the list:
 * Merkle Tree proofs (see "Merkle Tree and proofs" section below) is requested (with state version and peer ID) from previously connected node
   * if proof is not received or is incorrect, corresponding node is disconnected, blacklisted, its ID and its peers IDs are removed from previously created k-bucket
