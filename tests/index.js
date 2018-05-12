@@ -40,10 +40,11 @@
       return this._dht.finish_lookup(id);
     },
     _handle_lookup: function(nodes_to_connect_to){
-      var i$, len$, ref$, target_node_id, parent_node_id, parent_state_version, proof, target_node_state_version, target_node_peers;
+      var nodes_for_next_round, i$, len$, ref$, target_node_id, parent_node_id, parent_state_version, proof, target_node_state_version, target_node_peers;
       if (!nodes_to_connect_to.length) {
         return;
       }
+      nodes_for_next_round = [];
       for (i$ = 0, len$ = nodes_to_connect_to.length; i$ < len$; ++i$) {
         ref$ = nodes_to_connect_to[i$], target_node_id = ref$[0], parent_node_id = ref$[1], parent_state_version = ref$[2];
         proof = this._request(parent_node_id, 'get_state_proof', [target_node_id, parent_state_version]);
@@ -51,10 +52,11 @@
         if (target_node_state_version) {
           ref$ = this._request(target_node_id, 'get_state', target_node_state_version), proof = ref$[0], target_node_peers = ref$[1];
           if (this._dht.check_state_proof(target_node_state_version, target_node_id, proof, target_node_id)) {
-            this._handle_lookup(this._dht.update_lookup(id, target_node_id, target_node_state_version, target_node_peers));
+            nodes_for_next_round = nodes_for_next_round.concat(this._dht.update_lookup(id, target_node_id, target_node_state_version, target_node_peers));
           }
         }
       }
+      this._handle_lookup(nodes_for_next_round);
     },
     put: function(data){
       var infohash, i$, ref$, len$, node;
