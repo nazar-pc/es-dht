@@ -189,7 +189,7 @@
       /**
        * @param {!Uint8Array}			id					The same as in `start_lookup()`
        * @param {!Uint8Array}			node_id				As returned by `start_lookup()`
-       * @param {!Uint8Array}			node_state_version	State of `node_id` that corresponds to `parent_peer_state_version`
+       * @param {!Uint8Array}			node_state_version	Corresponding state version for `node_id`
        * @param {Array<!Uint8Array>}	node_peers			Peers of `node_id` at state `node_state_version` or `null` if connection to `node_id` have failed
        *
        * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
