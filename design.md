@@ -1,6 +1,6 @@
 # Entangled state DHT (ES-DHT) framework design
 
-Complements specification version: ?
+Complements specification version: 0.1.0
 
 Author: Nazar Mokrynskyi
 
@@ -38,7 +38,7 @@ So local state of the node in ES-DHT consist of peers IDs, their state versions 
 
 Merkle Tree is organized by placing peers IDs, each followed by corresponding state version and own ID (twice) at the end (see "Merkle Tree and proofs" section below).
 This way every state version can implicitly prove not only its own contents, but also contents of each peer.
-And since each peer's state version also contains information about their peers (hence entangled state in the name) and so on recursively, state version effectively represents a snapshot of the view from current node onto the whole network.
+And since each peer's state version also contains information about their peers (hence entangled state in the name) and so on recursively, state version effectively represents an immutable snapshot of the view from current node onto the whole network.
 
 This property is essential for ES-DHT. Having snapshot of the network, we can do lookups always one step ahead of adversary and at the same time being able to identify with non-zero probability when active adversary tries to influence lookup process.
 
@@ -47,25 +47,19 @@ Node should keep a history of its states and regularly notify peers about change
 ### Lookup
 Lookup is proceeded in rounds, each round may contain multiple parallel queries. Each lookup round is done locally similarly to NISAN and then connections to useful nodes are established.
 
-When lookup is started, new k-bucket is created and IDs of all peers (that correspond to latest local state version at that moment of time) as we as their peers IDs are added.
-Then IDs closest to target ID are selected and Merkle Tree proofs (see "Merkle Tree and proofs" section below) are requested for those IDs that are not peers yet from corresponding peers.
-If proof for ID is not received or is incorrect, corresponding peer is disconnected, blacklisted, its ID and its peers IDs are removed from previously created k-bucket.
-For nodes with correct proofs new connections are created in parallel, state at version from above proof is requested and peers are added to k-bucket.
+In each round specified number of nodes is selected from all of the nodes known (both peers and their peers).
+If node that is not yet connected appear in the list, connection to it is established and list of peers is requested for state version that we get from already connected node.
 
-Then process repeats starting from selecting closest nodes from k-bucket until all of the closest nodes are peers, at which point lookup is finished.
-Now either node with target ID will be a peer or nodes that are closest to target ID will be known (for instance, in case of storing some data in DHT).
+Then process repeats until all of the closest nodes are connected, at which point lookup is finished.
+Now either node with target ID will be directly connected or nodes that are closest to target ID will be known (for instance, in case of storing some data in DHT).
 
 Such lookup procedure doesn't disclose target ID to peers, but if there are many lookup rounds and a lot of colluding nodes are along the way, adversary can figure out approximate range for target ID.
 
 ### Merkle Tree and proofs
 Merkle Tree in ES-DHT must use hash function, that produces values from the same ID space as node ID. ES-DHT doesn't specify particular hash function though.
 
-Merkle Tree proof is a binary string that consists of blocks. Each block starts with `0` or `1` for left and right accordingly, where hash of ID for which proof is generated should be inserted and followed by the other hash on the same level.
-In our case we will only request hashes for IDs of peers, so the first block will always start with `0` and will be followed by state version of the peer, which we can extract if proof is correct.
-
-One minor exception from this rule is state of node itself, in this case proof is generated for node's ID and `0` will be followed by again with node's ID.
-
-Merkle Tree construction, where each peer's ID is followed by state version is very useful, since we don't need additional operations to know which state version of peer's peer corresponds to peer's state version.
+Merkle Tree structure where peer ID is followed by state version results in useful property of proofs: they contain state version of a peer.
+So when one node requests proof for a peer, it will also receive its state version.
 
 ### Important considerations
 ES-DHT doesn't specify anything related to transport layer, so it is important to keep it secure (for instance, using signatures that correspond to node's ID/public key).

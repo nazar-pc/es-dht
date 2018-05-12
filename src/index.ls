@@ -4,7 +4,7 @@
  * @license 0BSD
  */
 /*
- * Implements version ? of the specification
+ * Implements version 0.1.0 of the specification
  */
 /**
  * @param {!Uint8Array}	array1
