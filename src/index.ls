@@ -95,7 +95,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		# Lookups that are in progress
 		@_lookups							= ArrayMap()
 		@_insert_state(new Map)
-		# TODO: More stuff here
 
 	DHT:: =
 		/**
@@ -316,7 +315,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			items			= @_reduce_state_to_proof_items(new_state)
 			state_version	= merkle-tree-binary['get_root'](items, @_hash)
 			@_state.add(state_version, new_state)
-		# TODO: Many more methods
 	Object.defineProperty(DHT::, 'constructor', {value: DHT})
 
 	DHT
