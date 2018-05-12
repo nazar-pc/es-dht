@@ -52,8 +52,8 @@
     }
     LRU.prototype = {
       /**
-       * @param {!Uint8Array}			key
-       * @param {!Array<!Uint8Array>}	value
+       * @param {!Uint8Array}	key
+       * @param {!Map}		value
        */
       add: function(key, value){
         if (this._map.has(key)) {
@@ -68,7 +68,7 @@
       /**
        * @param {!Uint8Array}	key
        *
-       * @return {!Array<!Uint8Array>}
+       * @return {!Map}
        */,
       get: function(key){
         return this._map.get(key);
@@ -222,7 +222,7 @@
             connections_awaiting.add(closest_node_id);
           }
         }
-        nodes_to_connect_to;
+        return nodes_to_connect_to;
       }
       /**
        * @param {!Uint8Array} id The same as in `start_lookup()`
@@ -289,7 +289,7 @@
         state_version = state_version || this._state.last_key();
         state = this._get_state(state_version);
         if (!state) {
-          null;
+          return null;
         }
         proof = this['get_state_proof'](state_version, this._id);
         return [state_version, proof, Array.from(state.keys())];
@@ -302,7 +302,10 @@
       _get_state: function(state_version){
         state_version == null && (state_version = null);
         state_version = state_version || this._state.last_key();
-        return this._state.get(state_version) || null;
+        if (!state_version) {
+          return null;
+        }
+        return this._state.get(state_version);
       }
       /**
        * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
@@ -314,7 +317,7 @@
         state_version == null && (state_version = null);
         state = this._get_state(state_version);
         if (!state) {
-          null;
+          return null;
         }
         return ArrayMap(Array.from(state));
       }

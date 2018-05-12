@@ -39,8 +39,8 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		@_last_key	= null
 	LRU:: =
 		/**
-		 * @param {!Uint8Array}			key
-		 * @param {!Array<!Uint8Array>}	value
+		 * @param {!Uint8Array}	key
+		 * @param {!Map}		value
 		 */
 		add : (key, value) !->
 			if @_map.has(key)
@@ -52,7 +52,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		/**
 		 * @param {!Uint8Array}	key
 		 *
-		 * @return {!Array<!Uint8Array>}
+		 * @return {!Map}
 		 */
 		get : (key) ->
 			@_map.get(key)
@@ -157,7 +157,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 *
 		 * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
 		 */
-		'update_lookup' : (id, node_id, node_state_version, node_peers) !->
+		'update_lookup' : (id, node_id, node_state_version, node_peers) ->
 			lookup	= @_lookups.get(id)
 			if !lookup
 				return []
@@ -230,7 +230,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			state_version	= state_version || @_state.last_key()
 			state			= @_get_state(state_version)
 			if !state
-				null
+				return null
 			# Get proof that own ID is in this state version
 			proof	= @'get_state_proof'(state_version, @_id)
 			[state_version, proof, Array.from(state.keys())]
@@ -241,7 +241,9 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 */
 		_get_state : (state_version = null) ->
 			state_version	= state_version || @_state.last_key()
-			@_state.get(state_version) || null
+			if !state_version
+				return null
+			@_state.get(state_version)
 		/**
 		 * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
 		 *
@@ -250,7 +252,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		_get_state_copy : (state_version = null) ->
 			state	= @_get_state(state_version)
 			if !state
-				null
+				return null
 			ArrayMap(Array.from(state))
 		/**
 		 * Generate proof about peer in current state version
