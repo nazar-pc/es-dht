@@ -96,21 +96,24 @@
     /**
      * @constructor
      *
-     * @param {!Uint8Array}	id					Own ID
-     * @param {!Function}	hash_function		Hash function to be used for Merkle Tree
-     * @param {number}		bucket_size			Size of a bucket from Kademlia design
-     * @param {number}		state_history_size	How many versions of local history will be kept
+     * @param {!Uint8Array}	id									Own ID
+     * @param {!Function}	hash_function						Hash function to be used for Merkle Tree
+     * @param {number}		bucket_size							Size of a bucket from Kademlia design
+     * @param {number}		state_history_size					How many versions of local history will be kept
+     * @param {number}		fraction_of_nodes_from_same_peer	Max fraction of nodes originated from single peer allowed on lookup start
      *
      * @return {!DHT}
      */
-    function DHT(id, hash_function, bucket_size, state_history_size){
+    function DHT(id, hash_function, bucket_size, state_history_size, fraction_of_nodes_from_same_peer){
+      fraction_of_nodes_from_same_peer == null && (fraction_of_nodes_from_same_peer = 0.2);
       if (!(this instanceof DHT)) {
-        return new DHT(id, hash_function, bucket_size, state_history_size);
+        return new DHT(id, hash_function, bucket_size, state_history_size, fraction_of_nodes_from_same_peer);
       }
       this._id = id;
       this._id_length = id.length;
-      this._bucket_size = bucket_size;
       this._hash = hash_function;
+      this._bucket_size = bucket_size;
+      this._fraction_of_nodes_from_same_peer = fraction_of_nodes_from_same_peer;
       this._state = LRU(state_history_size);
       this._peers = kBucketSync(this._id, bucket_size);
       this._lookups = ArrayMap();
@@ -124,7 +127,7 @@
        * @return {!Array<!Array<!Uint8Array>>} Array of items, each item is an array of `Uint8Array`s `[node_id, parent_peer_id, parent_peer_state_version]`
        */
       'start_lookup': function(id, number){
-        var bucket, parents, state, closest_so_far, nodes_to_connect_to, connections_awaiting, i$, len$, closest_node_id, parent_peer_id, parent_peer_state_version;
+        var bucket, parents, state, max_fraction, current_number, closest_so_far, closest_nodes_found, max_count_allowed, nodes_to_connect_to, connections_awaiting, originated_from, retry, i$, len$, closest_node_id, parent_peer_id, count, parent_peer_state_version;
         number == null && (number = this._bucket_size);
         if (this._peers.has(id)) {
           return [];
@@ -143,16 +146,41 @@
             }
           }
         });
-        closest_so_far = bucket['closest'](id, number);
-        nodes_to_connect_to = [];
-        connections_awaiting = ArraySet();
-        for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
-          closest_node_id = closest_so_far[i$];
-          parent_peer_id = parents.get(closest_node_id);
-          if (parent_peer_id) {
-            parent_peer_state_version = state.get(parent_peer_id);
-            nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version]);
-            connections_awaiting.add(closest_node_id);
+        max_fraction = Math.max(this._fraction_of_nodes_from_same_peer, 1 / this._peers.size);
+        current_number = number;
+        for (;;) {
+          closest_so_far = bucket['closest'](id, number);
+          closest_nodes_found = closest_so_far.length;
+          max_count_allowed = Math.ceil(closest_nodes_found * max_fraction);
+          nodes_to_connect_to = [];
+          connections_awaiting = ArraySet();
+          originated_from = ArrayMap();
+          retry = false;
+          for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
+            closest_node_id = closest_so_far[i$];
+            parent_peer_id = parents.get(closest_node_id);
+            if (parent_peer_id) {
+              count = originated_from.get(parent_peer_id) || 0;
+              originated_from.set(parent_peer_id, count + 1);
+              if (count > max_count_allowed) {
+                bucket.del(closest_node_id);
+                retry = true;
+              } else {
+                parent_peer_state_version = state.get(parent_peer_id);
+                nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version]);
+                connections_awaiting.add(closest_node_id);
+              }
+            } else {
+              count = originated_from.get(closest_node_id) || 0;
+              originated_from.set(closest_node_id, count + 1);
+              if (count > max_count_allowed) {
+                bucket.del(closest_node_id);
+                retry = true;
+              }
+            }
+          }
+          if (!retry) {
+            break;
           }
         }
         this._lookups.set(id, [connections_awaiting, bucket, number]);
