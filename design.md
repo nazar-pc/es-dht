@@ -77,4 +77,4 @@ This design is heavily inspired by [Kademlia](http://www.scs.stanford.edu/~dm/ho
 
 [ShadowWalker](https://www.freehaven.net/anonbib/cache/ccs09-shadowwalker.pdf) was a starting point for designing hierarchy of entangled states.
 
-[NISAN](https://www.freehaven.net/anonbib/cache/ccs09-nisan.pdf)'s idea of hiding target ID was used 
+[NISAN](https://www.freehaven.net/anonbib/cache/ccs09-nisan.pdf)'s idea of hiding target ID was also used as an integral part of lookup process.
