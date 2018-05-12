@@ -113,7 +113,8 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 				for peer_peer_id in peer_peers
 					if !parents.has(peer_peer_id) && bucket.set(peer_peer_id)
 						parents.set(peer_peer_id, peer_id)
-			# TODO: Somehow limit impact if one node has too many peers and occupy all of the closest nodes, effectively controlling lookup
+			# TODO: Somehow limit impact if one peer has too many peers and occupy all of the closest nodes, effectively controlling lookup
+			# TODO: Limit nodes originated from one peer to 20% of nodes at most (unless less than 5 peers are present in total, in which case increase ration)
 			closest_so_far			= bucket['closest'](id, number)
 			nodes_to_connect_to		= []
 			connections_awaiting	= ArraySet()
