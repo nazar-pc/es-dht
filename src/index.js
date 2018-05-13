@@ -408,6 +408,6 @@
   } else if (typeof exports === 'object') {
     module.exports = Wrapper(require('array-map-set'), require('k-bucket-sync'), require('merkle-tree-binary'));
   } else {
-    this['detox_transport'] = Wrapper(this['array_map_set'], this['k_bucket_sync'], this['merkle_tree_binary']);
+    this['es_dht'] = Wrapper(this['array_map_set'], this['k_bucket_sync'], this['merkle_tree_binary']);
   }
 }).call(this);

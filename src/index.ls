@@ -329,4 +329,4 @@ else if typeof exports == 'object'
 	module.exports = Wrapper(require('array-map-set'), require('k-bucket-sync'), require('merkle-tree-binary'))
 else
 	# Browser globals
-	@'detox_transport' = Wrapper(@'array_map_set', @'k_bucket_sync', @'merkle_tree_binary')
+	@'es_dht' = Wrapper(@'array_map_set', @'k_bucket_sync', @'merkle_tree_binary')
