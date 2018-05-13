@@ -6,7 +6,7 @@
  */
 (function(){
   /*
-   * Implements version 0.1.0 of the specification
+   * Implements version 0.1.1 of the specification
    */
   /**
    * @param {!Uint8Array}	array1
@@ -30,6 +30,20 @@
       }
     }
     return true;
+  }
+  /**
+   * @param {!Uint8Array} array1
+   * @param {!Uint8Array} array2
+   *
+   * @return {!Uint8Array}
+   */
+  function concat(array1, array2){
+    var length, x$;
+    length = array1.length;
+    x$ = new Uint8Array(length * 2);
+    x$.set(array1);
+    x$.set(array2, length);
+    return x$;
   }
   function Wrapper(arrayMapSet, kBucketSync, merkleTreeBinary){
     var ArrayMap, ArraySet;
@@ -129,7 +143,7 @@
       'start_lookup': function(id, number){
         var bucket, parents, state, max_fraction, current_number, closest_so_far, closest_nodes_found, max_count_allowed, nodes_to_connect_to, connections_awaiting, originated_from, retry, i$, len$, closest_node_id, parent_peer_id, count, parent_peer_state_version;
         number == null && (number = this._bucket_size);
-        if (this._peers.has(id)) {
+        if (this._peers['has'](id)) {
           return [];
         }
         bucket = kBucketSync(id, number);
@@ -146,7 +160,7 @@
             }
           }
         });
-        max_fraction = Math.max(this._fraction_of_nodes_from_same_peer, 1 / this._peers.size);
+        max_fraction = Math.max(this._fraction_of_nodes_from_same_peer, 1 / this._peers['count']());
         current_number = number;
         for (;;) {
           closest_so_far = bucket['closest'](id, number);
@@ -233,7 +247,7 @@
         var lookup, bucket, number;
         lookup = this._lookups.get(id);
         this._lookups['delete'](id);
-        if (this._peers.has(id)) {
+        if (this._peers['has'](id)) {
           return [id];
         }
         if (!lookup) {
@@ -248,21 +262,47 @@
        * @param {!Uint8Array}			proof				Proof for specified state
        * @param {!Array<!Uint8Array>}	peer_peers			Peer's peers that correspond to `state_version`
        *
-       * @return {boolean} `false` if proof is not valid or if a bucket that corresponds to this peer is already full
+       * @return {boolean} `false` if proof is not valid, returning `true` only means there was not errors, but peer was not necessarily added to k-bucket
+       *                   (use `has_peer()` method if confirmation of addition to k-bucket is needed)
        */,
       'set_peer': function(peer_id, peer_state_version, proof, peer_peers){
-        var detected_peer_id, state;
+        var expected_number_of_items, proof_block_size, expected_proof_height, proof_height, last_block, i$, to$, block, detected_peer_id, state;
+        expected_number_of_items = peer_peers.length * 2 + 2;
+        proof_block_size = this._id_length + 1;
+        expected_proof_height = Math.log2(expected_number_of_items);
+        proof_height = proof.length / proof_block_size;
+        if (proof_height !== expected_proof_height) {
+          if (proof_height !== Math.ceil(expected_proof_height)) {
+            return false;
+          }
+          last_block = peer_id;
+          for (i$ = 0, to$ = Math.ceil(Math.pow(Math.log2(expected_number_of_items), 2) - expected_number_of_items) / 2; i$ <= to$; ++i$) {
+            block = i$;
+            if (proof[block * proof_block_size] !== 0 || !are_arrays_equal(proof.subarray(block * proof_block_size + 1, (block + 1) * proof_block_size), last_block)) {
+              return false;
+            }
+            last_block = this._hash(concat(last_block, last_block));
+          }
+        }
         detected_peer_id = this._check_state_proof(peer_state_version, proof, peer_id);
         if (!detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)) {
           return false;
         }
-        if (!this._peers.set(peer_id)) {
-          return false;
+        if (!this._peers['set'](peer_id)) {
+          return true;
         }
         state = this._get_state_copy();
         state.set(peer_id, [peer_state_version, peer_peers]);
         this._insert_state(state);
         return true;
+      }
+      /**
+       * @param {!Uint8Array} node_id
+       *
+       * @return {boolean} `true` if node is our peer (stored in k-bucket)
+       */,
+      'has_peer': function(node_id){
+        return this._peers['has'](node_id);
       }
       /**
        * @param {!Uint8Array} peer_id Id of a peer

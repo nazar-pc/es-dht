@@ -83,6 +83,11 @@ Add or update peer with latest state version, proof for state version and peers.
 * `proof` - Proof that peer ID is inside latest state version
 * `peer_peers` - Peer's peers IDs
 
+Returns `false` if proof is not valid, returning `true` only means there was not errors, but peer was not necessarily added to k-bucket.
+
+### es_dht.has_peer(node_id : Uint8Array) : boolean
+Returns `true` if node is our peer (stored in k-bucket).
+
 ### es_dht.del_peer(peer_id : Uint8Array)
 Delete peer from DHT (for instance if it goes offline).
 

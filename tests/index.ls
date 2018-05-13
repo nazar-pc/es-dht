@@ -101,17 +101,17 @@ test('es-dht', (t) !->
 
 	console.log 'Warm-up...'
 
-	node_0	= instances.get(nodes[0])
-	node_5	= instances.get(nodes[5])
-	node_20	= instances.get(nodes[20])
+	node_a	= instances.get(nodes[Math.round(nodes.length * Math.random())])
+	node_b	= instances.get(nodes[Math.round(nodes.length * Math.random())])
+	node_c	= instances.get(nodes[Math.round(nodes.length * Math.random())])
 
 	data		= random_bytes(10)
-	infohash	= node_0.put(data)
+	infohash	= node_a.put(data)
 
 	t.ok(infohash, 'put succeeded')
-	t.equal(node_0.get(infohash), data, 'get on node 0 succeeded')
-	t.equal(node_5.get(infohash), data, 'get on node 5 succeeded')
-	t.equal(node_20.get(infohash), data, 'get on node 20 succeeded')
+	t.equal(node_a.get(infohash), data, 'get on node a succeeded')
+	t.equal(node_b.get(infohash), data, 'get on node b succeeded')
+	t.equal(node_c.get(infohash), data, 'get on node c succeeded')
 
 	instances.forEach (instance) !->
 		instance.destroy()

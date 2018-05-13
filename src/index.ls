@@ -4,7 +4,7 @@
  * @license 0BSD
  */
 /*
- * Implements version 0.1.0 of the specification
+ * Implements version 0.1.1 of the specification
  */
 /**
  * @param {!Uint8Array}	array1
@@ -21,6 +21,18 @@ function are_arrays_equal (array1, array2)
 		if item != array2[key]
 			return false
 	true
+/**
+ * @param {!Uint8Array} array1
+ * @param {!Uint8Array} array2
+ *
+ * @return {!Uint8Array}
+ */
+function concat (array1, array2)
+	length	= array1.length
+	new Uint8Array(length * 2)
+		..set(array1)
+		..set(array2, length)
+
 function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 	ArrayMap	= array-map-set['ArrayMap']
 	ArraySet	= array-map-set['ArraySet']
@@ -104,7 +116,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @return {!Array<!Array<!Uint8Array>>} Array of items, each item is an array of `Uint8Array`s `[node_id, parent_peer_id, parent_peer_state_version]`
 		 */
 		'start_lookup' : (id, number = @_bucket_size) ->
-			if @_peers.has(id)
+			if @_peers['has'](id)
 				return []
 			bucket		= k-bucket-sync(id, number)
 			parents		= ArrayMap()
@@ -114,7 +126,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 				for peer_peer_id in peer_peers
 					if !parents.has(peer_peer_id) && bucket.set(peer_peer_id)
 						parents.set(peer_peer_id, peer_id)
-			max_fraction	= Math.max(@_fraction_of_nodes_from_same_peer, 1 / @_peers.size)
+			max_fraction	= Math.max(@_fraction_of_nodes_from_same_peer, 1 / @_peers['count']())
 			current_number	= number
 			# On the first round of lookup we only allow some fraction of closest nodes to originate from the same peer
 			loop
@@ -185,7 +197,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		'finish_lookup' : (id) ->
 			lookup	= @_lookups.get(id)
 			@_lookups.delete(id)
-			if @_peers.has(id)
+			if @_peers['has'](id)
 				return [id]
 			if !lookup
 				return null
@@ -197,19 +209,44 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @param {!Uint8Array}			proof				Proof for specified state
 		 * @param {!Array<!Uint8Array>}	peer_peers			Peer's peers that correspond to `state_version`
 		 *
-		 * @return {boolean} `false` if proof is not valid or if a bucket that corresponds to this peer is already full
+		 * @return {boolean} `false` if proof is not valid, returning `true` only means there was not errors, but peer was not necessarily added to k-bucket
+		 *                   (use `has_peer()` method if confirmation of addition to k-bucket is needed)
 		 */
 		'set_peer' : (peer_id, peer_state_version, proof, peer_peers) ->
+			expected_number_of_items	= peer_peers.length * 2 + 2
+			proof_block_size			= @_id_length + 1
+			expected_proof_height		= Math.log2(expected_number_of_items)
+			proof_height				= proof.length / (proof_block_size)
+			# First check if proof height roughly corresponds to number of peer's peers advertised
+			if proof_height != expected_proof_height
+				if proof_height != Math.ceil(expected_proof_height)
+					return false
+				# Then check if there are non-advertised peers in state version
+				last_block	= peer_id
+				for block from 0 to Math.ceil(Math.log2(expected_number_of_items) ** 2 - (expected_number_of_items)) / 2
+					if (
+						proof[block * proof_block_size] != 0 ||
+						!are_arrays_equal(proof.subarray(block * proof_block_size + 1, (block + 1) * proof_block_size), last_block)
+					)
+						return false
+					last_block	= @_hash(concat(last_block, last_block))
 			# Since peer_id is added to the end of leaves of Merkle Tree and the rest items are added in pairs, it will appear there as pair of the same elements too
 			detected_peer_id	= @_check_state_proof(peer_state_version, proof, peer_id)
 			if !detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)
 				return false
-			if !@_peers.set(peer_id)
-				return false
+			if !@_peers['set'](peer_id)
+				return true
 			state	= @_get_state_copy()
 			state.set(peer_id, [peer_state_version, peer_peers])
 			@_insert_state(state)
 			true
+		/**
+		 * @param {!Uint8Array} node_id
+		 *
+		 * @return {boolean} `true` if node is our peer (stored in k-bucket)
+		 */
+		'has_peer' : (node_id) ->
+			@_peers['has'](node_id)
 		/**
 		 * @param {!Uint8Array} peer_id Id of a peer
 		 */
@@ -217,7 +254,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			state	= @_get_state_copy()
 			if !state.has(peer_id)
 				return
-			@_peers.delete(peer_id)
+			@_peers['delete'](peer_id)
 			state.delete(peer_id)
 			@_insert_state(state)
 		/**

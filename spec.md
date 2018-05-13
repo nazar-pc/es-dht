@@ -1,6 +1,6 @@
 # Entangled state DHT (ES-DHT) framework specification
 
-Specification version: 0.1.0
+Specification version: 0.1.1
 
 Author: Nazar Mokrynskyi
 
@@ -71,6 +71,12 @@ Merkle Tree proof is a binary string that consists of blocks. Each block starts 
 In our case we will only request hashes for IDs of peers, so the first block always starts with `0` and is followed by state version of the peer, which we can extract if proof is correct.
 
 One minor exception from this rule is state of node itself, in this case proof is generated for node's ID and `0` will be followed by again with node's ID.
+
+When verifying proof for node's own ID a few hardening methods must be applied:
+* checking whether proof height (number of blocks) corresponds to advertised number of peers, number of blocks should be equal to `Math.ceil(Math.log2(peers.length * 2 + 2))` (in JavaScript notation)
+* if Merkle Tree if not balanced (after previous check) then check first `Math.ceil(Math.log2(peers.length * 2 + 2) ** 2 - (peers.length * 2 + 2)) / 2` proof blocks, they should all correspond to node's own ID
+
+These hardening methods do not prove that peer advertised all of its peers, but it does guarantee that only its advertised peers are a part of root hash.
 
 Merkle Tree construction, where each peer's ID is followed by state version is very useful, since we don't need additional operations to know which state version of peer's peer corresponds to peer's state version.
 
