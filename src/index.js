@@ -370,13 +370,13 @@
        * @return {!Uint8Array}
        */,
       'get_state_proof': function(state_version, peer_id){
-        var state, items, proof;
+        var state, items;
         state = this._get_state(state_version);
         if (!state || (!state.has(peer_id) && !are_arrays_equal(peer_id, this._id))) {
           return new Uint8Array(0);
         } else {
           items = this._reduce_state_to_proof_items(state);
-          return proof = merkleTreeBinary['get_proof'](items, peer_id, this._hash);
+          return merkleTreeBinary['get_proof'](items, peer_id, this._hash);
         }
       }
       /**

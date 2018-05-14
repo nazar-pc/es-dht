@@ -305,7 +305,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 				new Uint8Array(0)
 			else
 				items	= @_reduce_state_to_proof_items(state)
-				proof	= merkle-tree-binary['get_proof'](items, peer_id, @_hash)
+				merkle-tree-binary['get_proof'](items, peer_id, @_hash)
 		/**
 		 * @param {!Map} state
 		 *
