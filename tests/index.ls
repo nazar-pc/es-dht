@@ -30,9 +30,9 @@ instances	= ArrayMap()
 			@_dht.set_peer(bootstrap_node_id, state_version, proof, peers)
 Simple_DHT:: =
 	lookup : (id) ->
-		@_handle_lookup(@_dht.start_lookup(id))
+		@_handle_lookup(id, @_dht.start_lookup(id))
 		@_dht.finish_lookup(id)
-	_handle_lookup : (nodes_to_connect_to) !->
+	_handle_lookup : (id, nodes_to_connect_to) !->
 		if !nodes_to_connect_to.length
 			return
 		nodes_for_next_round	= []
@@ -44,7 +44,7 @@ Simple_DHT:: =
 				[proof, target_node_peers]	= @_request(target_node_id, 'get_state', target_node_state_version)
 				if @_dht.check_state_proof(target_node_state_version, target_node_id, proof, target_node_id)
 					nodes_for_next_round	= nodes_for_next_round.concat(@_dht.update_lookup(id, target_node_id, target_node_state_version, target_node_peers))
-		@_handle_lookup(nodes_for_next_round)
+		@_handle_lookup(id, nodes_for_next_round)
 	put : (data) ->
 		infohash	= sha1(data)
 		@_data.set(infohash, data)

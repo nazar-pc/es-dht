@@ -36,10 +36,10 @@
   }
   Simple_DHT.prototype = {
     lookup: function(id){
-      this._handle_lookup(this._dht.start_lookup(id));
+      this._handle_lookup(id, this._dht.start_lookup(id));
       return this._dht.finish_lookup(id);
     },
-    _handle_lookup: function(nodes_to_connect_to){
+    _handle_lookup: function(id, nodes_to_connect_to){
       var nodes_for_next_round, i$, len$, ref$, target_node_id, parent_node_id, parent_state_version, proof, target_node_state_version, target_node_peers;
       if (!nodes_to_connect_to.length) {
         return;
@@ -56,7 +56,7 @@
           }
         }
       }
-      this._handle_lookup(nodes_for_next_round);
+      this._handle_lookup(id, nodes_for_next_round);
     },
     put: function(data){
       var infohash, i$, ref$, len$, node;
