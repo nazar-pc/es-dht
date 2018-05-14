@@ -41,15 +41,15 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 	 *
 	 * @param {number}	size
 	 *
-	 * @return {!LRU}
+	 * @return {!State_cache}
 	 */
-	!function LRU (size)
-		if !(@ instanceof LRU)
-			return new LRU(size)
+	!function State_cache (size)
+		if !(@ instanceof State_cache)
+			return new State_cache(size)
 		@_size		= size
 		@_map		= ArrayMap()
 		@_last_key	= null
-	LRU:: =
+	State_cache:: =
 		/**
 		 * @param {!Uint8Array}	key
 		 * @param {!Map}		value
@@ -80,7 +80,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 */
 		last_key : ->
 			@_last_key
-	Object.defineProperty(LRU::, 'constructor', {value: LRU})
+	Object.defineProperty(State_cache::, 'constructor', {value: State_cache})
 	/**
 	 * @constructor
 	 *
@@ -102,7 +102,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		@_hash								= hash_function
 		@_bucket_size						= bucket_size
 		@_fraction_of_nodes_from_same_peer	= fraction_of_nodes_from_same_peer
-		@_state								= LRU(state_history_size)
+		@_state								= State_cache(state_history_size)
 		@_peers								= k-bucket-sync(@_id, bucket_size)
 		# Lookups that are in progress
 		@_lookups							= ArrayMap()

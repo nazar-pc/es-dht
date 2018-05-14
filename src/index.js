@@ -54,17 +54,17 @@
      *
      * @param {number}	size
      *
-     * @return {!LRU}
+     * @return {!State_cache}
      */
-    function LRU(size){
-      if (!(this instanceof LRU)) {
-        return new LRU(size);
+    function State_cache(size){
+      if (!(this instanceof State_cache)) {
+        return new State_cache(size);
       }
       this._size = size;
       this._map = ArrayMap();
       this._last_key = null;
     }
-    LRU.prototype = {
+    State_cache.prototype = {
       /**
        * @param {!Uint8Array}	key
        * @param {!Map}		value
@@ -104,8 +104,8 @@
         return this._last_key;
       }
     };
-    Object.defineProperty(LRU.prototype, 'constructor', {
-      value: LRU
+    Object.defineProperty(State_cache.prototype, 'constructor', {
+      value: State_cache
     });
     /**
      * @constructor
@@ -128,7 +128,7 @@
       this._hash = hash_function;
       this._bucket_size = bucket_size;
       this._fraction_of_nodes_from_same_peer = fraction_of_nodes_from_same_peer;
-      this._state = LRU(state_history_size);
+      this._state = State_cache(state_history_size);
       this._peers = kBucketSync(this._id, bucket_size);
       this._lookups = ArrayMap();
       this._insert_state(new Map);
