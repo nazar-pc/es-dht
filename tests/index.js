@@ -136,7 +136,7 @@
     t.equal(node_b.get(infohash), data, 'get on node b succeeded');
     t.equal(node_c.get(infohash), data, 'get on node c succeeded');
     lookup_nodes = node_a.lookup(random_bytes(20));
-    t.equal(lookup_nodes.length, 20, 'Found 20 nodes on random lookup');
+    t.ok(lookup_nodes.length >= 2 && lookup_nodes.length <= 20, 'Found at most 20 nodes on random lookup, but not less than 2');
     t.ok(lookup_nodes[0] instanceof Uint8Array, 'Node has correct ID type');
     t.equal(lookup_nodes[0].length, 20, 'Node has correct ID length');
     instances.forEach(function(instance){
