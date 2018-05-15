@@ -38,12 +38,16 @@ Simple_DHT:: =
 		nodes_for_next_round	= []
 		for [target_node_id, parent_node_id, parent_state_version] in nodes_to_connect_to
 			proof						= @_request(parent_node_id, 'get_state_proof', [target_node_id, parent_state_version])
-			target_node_state_version	= @_dht.check_state_proof(parent_state_version, parent_node_id, proof, target_node_id)
+			target_node_state_version	= @_dht.check_state_proof(parent_state_version, proof, target_node_id)
 			if target_node_state_version
 				# Here we implicitly assume that `parent_node_id` helped us to connect to `target_node_id`
 				[proof, target_node_peers]	= @_request(target_node_id, 'get_state', target_node_state_version)
-				if @_dht.check_state_proof(target_node_state_version, target_node_id, proof, target_node_id)
+				if @_dht.check_state_proof(target_node_state_version, proof, target_node_id).join?(',') == target_node_id.join(',')
 					nodes_for_next_round	= nodes_for_next_round.concat(@_dht.update_lookup(id, target_node_id, target_node_state_version, target_node_peers))
+				else
+					throw new Error
+			else
+				throw new Error
 		@_handle_lookup(id, nodes_for_next_round)
 	put : (data) ->
 		infohash	= sha1(data)
@@ -80,7 +84,7 @@ Simple_DHT:: =
 				@_data.set(infohash, data)
 			case 'get_state_proof'
 				[peer_id, state_version]	= data
-				return @_dht.get_state_proof(peer_id, state_version)
+				return @_dht.get_state_proof(state_version, peer_id)
 			case 'get_state'
 				return @_dht.get_state(data).slice(1)
 			case 'put_state'

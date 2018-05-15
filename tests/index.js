@@ -48,12 +48,16 @@
       for (i$ = 0, len$ = nodes_to_connect_to.length; i$ < len$; ++i$) {
         ref$ = nodes_to_connect_to[i$], target_node_id = ref$[0], parent_node_id = ref$[1], parent_state_version = ref$[2];
         proof = this._request(parent_node_id, 'get_state_proof', [target_node_id, parent_state_version]);
-        target_node_state_version = this._dht.check_state_proof(parent_state_version, parent_node_id, proof, target_node_id);
+        target_node_state_version = this._dht.check_state_proof(parent_state_version, proof, target_node_id);
         if (target_node_state_version) {
           ref$ = this._request(target_node_id, 'get_state', target_node_state_version), proof = ref$[0], target_node_peers = ref$[1];
-          if (this._dht.check_state_proof(target_node_state_version, target_node_id, proof, target_node_id)) {
+          if ((typeof (ref$ = this._dht.check_state_proof(target_node_state_version, proof, target_node_id)).join == 'function' ? ref$.join(',') : void 8) === target_node_id.join(',')) {
             nodes_for_next_round = nodes_for_next_round.concat(this._dht.update_lookup(id, target_node_id, target_node_state_version, target_node_peers));
+          } else {
+            throw new Error;
           }
+        } else {
+          throw new Error;
         }
       }
       this._handle_lookup(id, nodes_for_next_round);
@@ -103,7 +107,7 @@
         break;
       case 'get_state_proof':
         peer_id = data[0], state_version = data[1];
-        return this._dht.get_state_proof(peer_id, state_version);
+        return this._dht.get_state_proof(state_version, peer_id);
       case 'get_state':
         return this._dht.get_state(data).slice(1);
       case 'put_state':

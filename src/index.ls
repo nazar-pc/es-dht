@@ -231,7 +231,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 						return false
 					last_block	= @_hash(concat(last_block, last_block))
 			# Since peer_id is added to the end of leaves of Merkle Tree and the rest items are added in pairs, it will appear there as pair of the same elements too
-			detected_peer_id	= @_check_state_proof(peer_state_version, proof, peer_id)
+			detected_peer_id	= @'check_state_proof'(peer_state_version, proof, peer_id)
 			if !detected_peer_id || !are_arrays_equal(detected_peer_id, peer_id)
 				return false
 			if !@_peers['set'](peer_id)
@@ -321,29 +321,15 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		/**
 		 * Generate proof about peer in current state version
 		 *
-		 * @param {!Uint8Array} state_version	Local state version
-		 * @param {!Uint8Array} peer_id			ID of peer that created proof
+		 * @param {!Uint8Array} state_version	State version for which proof was generated
 		 * @param {!Uint8Array} proof			Proof itself
-		 * @param {!Uint8Array} target_peer_id	ID of peer's peer for which proof was generated
+		 * @param {!Uint8Array} node_id			Node ID for which proof was generated
 		 *
-		 * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
+		 * @return {Uint8Array} `state_version` of `node_id` on success or `null` otherwise
 		 */
-		'check_state_proof' : (state_version, peer_id, proof, target_peer_id) ->
-			state	= @_get_state(state_version)
-			if !state
-				return null
-			[peer_state_version]	= state.get(peer_id)
-			@_check_state_proof(peer_state_version, proof, target_peer_id)
-		/**
-		 * @param {!Uint8Array} state_version
-		 * @param {!Uint8Array} proof
-		 * @param {!Uint8Array} target_peer_id
-		 *
-		 * @return {Uint8Array} `state_version` of `target_peer_id` on success or `null` otherwise
-		 */
-		_check_state_proof : (state_version, proof, target_peer_id) ->
+		'check_state_proof' : (state_version, proof, node_id) ->
 			# Correct proof will always start from `0` followed by state version, since peer ID and its state version are placed one after another in Merkle Tree
-			if proof[0] == 0 && merkle-tree-binary['check_proof'](state_version, proof, target_peer_id, @_hash)
+			if proof[0] == 0 && merkle-tree-binary['check_proof'](state_version, proof, node_id, @_hash)
 				proof.subarray(1, @_id_length + 1)
 			else
 				null
