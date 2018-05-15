@@ -126,9 +126,9 @@
       Simple_DHT(id, bootstrap_node_id);
     }
     console.log('Warm-up...');
-    node_a = instances.get(nodes[Math.round(nodes.length * Math.random())]);
-    node_b = instances.get(nodes[Math.round(nodes.length * Math.random())]);
-    node_c = instances.get(nodes[Math.round(nodes.length * Math.random())]);
+    node_a = instances.get(nodes[Math.floor(nodes.length * Math.random())]);
+    node_b = instances.get(nodes[Math.floor(nodes.length * Math.random())]);
+    node_c = instances.get(nodes[Math.floor(nodes.length * Math.random())]);
     data = random_bytes(10);
     infohash = node_a.put(data);
     t.ok(infohash, 'put succeeded');
