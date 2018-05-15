@@ -113,8 +113,8 @@
     }
   };
   test('es-dht', function(t){
-    var nodes, bootstrap_node_id, i$, _, id, node_a, node_b, node_c, data, infohash;
-    t.plan(4);
+    var nodes, bootstrap_node_id, i$, _, id, node_a, node_b, node_c, data, infohash, lookup_nodes;
+    t.plan(7);
     console.log('Creating instances...');
     nodes = [];
     bootstrap_node_id = random_bytes(20);
@@ -135,6 +135,10 @@
     t.equal(node_a.get(infohash), data, 'get on node a succeeded');
     t.equal(node_b.get(infohash), data, 'get on node b succeeded');
     t.equal(node_c.get(infohash), data, 'get on node c succeeded');
+    lookup_nodes = node_a.lookup(random_bytes(20));
+    t.equal(lookup_nodes.length, 20, 'Found 20 nodes on random lookup');
+    t.ok(lookup_nodes[0] instanceof Uint8Array, 'Node has correct ID type');
+    t.equal(lookup_nodes[0].length, 20, 'Node has correct ID length');
     instances.forEach(function(instance){
       instance.destroy();
     });

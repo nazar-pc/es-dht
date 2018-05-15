@@ -147,7 +147,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 							bucket.del(closest_node_id)
 							retry	= true
 						else
-							parent_peer_state_version	= state.get(parent_peer_id)
+							parent_peer_state_version	= state.get(parent_peer_id)[0]
 							nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version])
 							connections_awaiting.add(closest_node_id)
 					else
