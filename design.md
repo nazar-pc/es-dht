@@ -40,6 +40,8 @@ Merkle Tree is organized by placing peers IDs, each followed by corresponding st
 This way every state version can implicitly prove not only its own contents, but also contents of each peer.
 And since each peer's state version also contains information about their peers (hence entangled state in the name) and so on recursively, state version effectively represents an immutable snapshot of the view from current node onto the whole network.
 
+Awkward visualisation can be found in `design-state-propagation.png` image.
+
 This property is essential for ES-DHT. Having snapshot of the network, we can do lookups always one step ahead of adversary and at the same time being able to identify with non-zero probability when active adversary tries to influence lookup process.
 
 Node should keep a history of its states and regularly notify peers about changes (not immediately though, since it will have recursive snowball effect in the network).
