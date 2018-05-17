@@ -313,7 +313,7 @@
         if (!state.has(peer_id)) {
           return;
         }
-        this._peers['delete'](peer_id);
+        this._peers['del'](peer_id);
         state['delete'](peer_id);
         this._insert_state(state);
       }

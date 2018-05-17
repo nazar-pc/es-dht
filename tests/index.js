@@ -87,6 +87,12 @@
         return null;
       }
     },
+    get_peers: function(){
+      return this._dht.get_state()[2];
+    },
+    del_peer: function(peer_id){
+      this._dht.del_peer(peer_id);
+    },
     destroy: function(){
       clearInterval(this._interval);
     },
@@ -118,7 +124,7 @@
   };
   test('es-dht', function(t){
     var nodes, bootstrap_node_id, i$, _, id, node_a, node_b, node_c, data, infohash, lookup_nodes;
-    t.plan(7);
+    t.plan(8);
     console.log('Creating instances...');
     nodes = [];
     bootstrap_node_id = random_bytes(20);
@@ -143,6 +149,10 @@
     t.ok(lookup_nodes.length >= 2 && lookup_nodes.length <= 20, 'Found at most 20 nodes on random lookup, but not less than 2');
     t.ok(lookup_nodes[0] instanceof Uint8Array, 'Node has correct ID type');
     t.equal(lookup_nodes[0].length, 20, 'Node has correct ID length');
+    t.doesNotThrow(function(){
+      var ref$;
+      node_a.del_peer((ref$ = node_a.get_peers())[ref$.length - 1]);
+    }, 'Peer deletion works fine');
     instances.forEach(function(instance){
       instance.destroy();
     });

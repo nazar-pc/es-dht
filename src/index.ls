@@ -254,7 +254,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			state	= @_get_state_copy()
 			if !state.has(peer_id)
 				return
-			@_peers['delete'](peer_id)
+			@_peers['del'](peer_id)
 			state.delete(peer_id)
 			@_insert_state(state)
 		/**

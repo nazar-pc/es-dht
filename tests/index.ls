@@ -64,6 +64,10 @@ Simple_DHT:: =
 				if data
 					return data
 			null
+	get_peers : ->
+		@_dht.get_state()[2]
+	del_peer : (peer_id) !->
+		@_dht.del_peer(peer_id)
 	destroy : !->
 		clearInterval(@_interval)
 	_request : (target_id, command, data) ->
@@ -92,7 +96,7 @@ Simple_DHT:: =
 				@_dht.set_peer(source_id, state_version, proof, peers)
 
 test('es-dht', (t) !->
-	t.plan(7)
+	t.plan(8)
 
 	console.log 'Creating instances...'
 	nodes				= []
@@ -121,6 +125,10 @@ test('es-dht', (t) !->
 	t.ok(lookup_nodes.length >= 2 && lookup_nodes.length <= 20, 'Found at most 20 nodes on random lookup, but not less than 2')
 	t.ok(lookup_nodes[0] instanceof Uint8Array, 'Node has correct ID type')
 	t.equal(lookup_nodes[0].length, 20, 'Node has correct ID length')
+
+	t.doesNotThrow (!->
+		node_a.del_peer(node_a.get_peers()[* - 1])
+	), 'Peer deletion works fine'
 
 	instances.forEach (instance) !->
 		instance.destroy()
