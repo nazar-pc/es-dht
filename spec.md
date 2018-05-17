@@ -1,6 +1,6 @@
 # Entangled state DHT (ES-DHT) framework specification
 
-Specification version: 0.1.1
+Specification version: 0.1.2
 
 Author: Nazar Mokrynskyi
 
@@ -42,7 +42,7 @@ Because of this recursive nature, state changes must be sent to peers periodical
 ### Lookup
 Lookup is proceeded in rounds, each round may contain multiple parallel queries. Each lookup round is done locally similarly to NISAN and then connections to useful nodes are established.
 
-First, empty k-bucket is created and filled with all of the nodes known (both peers and their peers).
+First, empty k-bucket is created and filled with all of the nodes known (both peers and their peers, except own ID).
 
 In each round specified number of nodes (defaults to `k`, but may be increased/decreased) is selected from k-bucket that are closest to target ID.
 If node that is not yet connected (not a peer in the first round) appear in the list:
@@ -50,7 +50,7 @@ If node that is not yet connected (not a peer in the first round) appear in the 
   * if proof is not received or is incorrect, corresponding node is disconnected, blacklisted, its ID and its peers IDs are removed from previously created k-bucket
   * if proof is correct, state version is extracted
 * connection to node is established and list of its peers is requested for state version that we get in previous step
-* received peers are added to k-bucket
+* received peers are added to k-bucket (except own ID)
 
 Proofs requests and connections in each round happen in parallel all at the same time. When everything is done, next round starts.
 

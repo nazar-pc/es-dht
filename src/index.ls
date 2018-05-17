@@ -4,7 +4,7 @@
  * @license 0BSD
  */
 /*
- * Implements version 0.1.1 of the specification
+ * Implements version 0.1.2 of the specification
  */
 /**
  * @param {!Uint8Array}	array1
@@ -69,13 +69,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		get : (key) ->
 			@_map.get(key)
 		/**
-		 * @param {!Uint8Array}	key
-		 */
-		del : (key) !->
-			@_map.delete(key)
-			if !@_map.has(@_last_key)
-				@_last_key = Array.from(@_map.keys())[* - 1] || null
-		/**
 		 * @return {Uint8Array} `null` if there are no items
 		 */
 		last_key : ->
@@ -122,10 +115,12 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			parents		= ArrayMap()
 			state		= @_get_state()
 			state.forEach ([state_version, peer_peers], peer_id) !->
-				bucket.set(peer_id)
+				bucket['set'](peer_id)
 				for peer_peer_id in peer_peers
-					if !parents.has(peer_peer_id) && bucket.set(peer_peer_id)
+					if !parents.has(peer_peer_id) && bucket['set'](peer_peer_id)
 						parents.set(peer_peer_id, peer_id)
+			# Delete own ID from k-bucket, since we start from our node
+			bucket['del'](@_id)
 			max_fraction	= Math.max(@_fraction_of_nodes_from_same_peer, 1 / @_peers['count']())
 			current_number	= number
 			# On the first round of lookup we only allow some fraction of closest nodes to originate from the same peer
@@ -144,7 +139,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 						originated_from.set(parent_peer_id, count + 1)
 						if count > max_count_allowed
 							# This node should be discarded, since it exceeds quota for number of nodes originated from the same peer
-							bucket.del(closest_node_id)
+							bucket['del'](closest_node_id)
 							retry	= true
 						else
 							parent_peer_state_version	= state.get(parent_peer_id)[0]
@@ -155,7 +150,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 						originated_from.set(closest_node_id, count + 1)
 						if count > max_count_allowed
 							# This node should be discarded, since it exceeds quota for number of nodes originated from the same peer
-							bucket.del(closest_node_id)
+							bucket['del'](closest_node_id)
 							retry	= true
 				if !retry
 					break
@@ -176,12 +171,14 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			[connections_awaiting, bucket, number]	= lookup
 			connections_awaiting.delete(node_id)
 			if !node_peers
-				bucket.del(node_id)
+				bucket['del'](node_id)
 				return []
 			added_nodes	= ArraySet()
 			for node_peer_id in node_peers
-				if !bucket.has(node_peer_id) && bucket.set(node_peer_id)
+				if !bucket['has'](node_peer_id) && bucket['set'](node_peer_id)
 					added_nodes.add(node_peer_id)
+			# Delete own ID from k-bucket, since we start from our node
+			bucket['del'](@_id)
 			closest_so_far		= bucket['closest'](id, number)
 			nodes_to_connect_to	= []
 			for closest_node_id in closest_so_far
@@ -213,6 +210,9 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 *                   (use `has_peer()` method if confirmation of addition to k-bucket is needed)
 		 */
 		'set_peer' : (peer_id, peer_state_version, proof, peer_peers) ->
+			# If we add ourself to own peers then something went really wrong, reject immediately
+			if are_arrays_equal(@_id, peer_id)
+				return false
 			expected_number_of_items	= peer_peers.length * 2 + 2
 			proof_block_size			= @_id_length + 1
 			expected_proof_height		= Math.log2(expected_number_of_items)

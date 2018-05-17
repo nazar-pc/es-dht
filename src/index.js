@@ -6,7 +6,7 @@
  */
 (function(){
   /*
-   * Implements version 0.1.1 of the specification
+   * Implements version 0.1.2 of the specification
    */
   /**
    * @param {!Uint8Array}	array1
@@ -88,16 +88,6 @@
         return this._map.get(key);
       }
       /**
-       * @param {!Uint8Array}	key
-       */,
-      del: function(key){
-        var ref$;
-        this._map['delete'](key);
-        if (!this._map.has(this._last_key)) {
-          this._last_key = (ref$ = Array.from(this._map.keys()))[ref$.length - 1] || null;
-        }
-      }
-      /**
        * @return {Uint8Array} `null` if there are no items
        */,
       last_key: function(){
@@ -152,14 +142,15 @@
         state.forEach(function(arg$, peer_id){
           var state_version, peer_peers, i$, len$, peer_peer_id;
           state_version = arg$[0], peer_peers = arg$[1];
-          bucket.set(peer_id);
+          bucket['set'](peer_id);
           for (i$ = 0, len$ = peer_peers.length; i$ < len$; ++i$) {
             peer_peer_id = peer_peers[i$];
-            if (!parents.has(peer_peer_id) && bucket.set(peer_peer_id)) {
+            if (!parents.has(peer_peer_id) && bucket['set'](peer_peer_id)) {
               parents.set(peer_peer_id, peer_id);
             }
           }
         });
+        bucket['del'](this._id);
         max_fraction = Math.max(this._fraction_of_nodes_from_same_peer, 1 / this._peers['count']());
         current_number = number;
         for (;;) {
@@ -177,7 +168,7 @@
               count = originated_from.get(parent_peer_id) || 0;
               originated_from.set(parent_peer_id, count + 1);
               if (count > max_count_allowed) {
-                bucket.del(closest_node_id);
+                bucket['del'](closest_node_id);
                 retry = true;
               } else {
                 parent_peer_state_version = state.get(parent_peer_id)[0];
@@ -188,7 +179,7 @@
               count = originated_from.get(closest_node_id) || 0;
               originated_from.set(closest_node_id, count + 1);
               if (count > max_count_allowed) {
-                bucket.del(closest_node_id);
+                bucket['del'](closest_node_id);
                 retry = true;
               }
             }
@@ -217,16 +208,17 @@
         connections_awaiting = lookup[0], bucket = lookup[1], number = lookup[2];
         connections_awaiting['delete'](node_id);
         if (!node_peers) {
-          bucket.del(node_id);
+          bucket['del'](node_id);
           return [];
         }
         added_nodes = ArraySet();
         for (i$ = 0, len$ = node_peers.length; i$ < len$; ++i$) {
           node_peer_id = node_peers[i$];
-          if (!bucket.has(node_peer_id) && bucket.set(node_peer_id)) {
+          if (!bucket['has'](node_peer_id) && bucket['set'](node_peer_id)) {
             added_nodes.add(node_peer_id);
           }
         }
+        bucket['del'](this._id);
         closest_so_far = bucket['closest'](id, number);
         nodes_to_connect_to = [];
         for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
@@ -267,6 +259,9 @@
        */,
       'set_peer': function(peer_id, peer_state_version, proof, peer_peers){
         var expected_number_of_items, proof_block_size, expected_proof_height, proof_height, last_block, i$, to$, block, detected_peer_id, state;
+        if (are_arrays_equal(this._id, peer_id)) {
+          return false;
+        }
         expected_number_of_items = peer_peers.length * 2 + 2;
         proof_block_size = this._id_length + 1;
         expected_proof_height = Math.log2(expected_number_of_items);
