@@ -62,7 +62,6 @@
       }
       this._size = size;
       this._map = ArrayMap();
-      this._last_key = null;
     }
     State_cache.prototype = {
       /**
@@ -74,7 +73,6 @@
           return;
         }
         this._map.set(key, value);
-        this._last_key = key;
         if (this._map.size > this._size) {
           this._map['delete'](this._map.keys().next().value);
         }
@@ -86,12 +84,6 @@
        */,
       get: function(key){
         return this._map.get(key);
-      }
-      /**
-       * @return {Uint8Array} `null` if there are no items
-       */,
-      last_key: function(){
-        return this._last_key;
       }
     };
     Object.defineProperty(State_cache.prototype, 'constructor', {

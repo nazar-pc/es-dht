@@ -46,9 +46,8 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 	!function State_cache (size)
 		if !(@ instanceof State_cache)
 			return new State_cache(size)
-		@_size		= size
-		@_map		= ArrayMap()
-		@_last_key	= null
+		@_size	= size
+		@_map	= ArrayMap()
 	State_cache:: =
 		/**
 		 * @param {!Uint8Array}	key
@@ -58,7 +57,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			if @_map.has(key)
 				return
 			@_map.set(key, value)
-			@_last_key	= key
 			if @_map.size > @_size
 				@_map.delete(@_map.keys().next().value)
 		/**
@@ -68,11 +66,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 */
 		get : (key) ->
 			@_map.get(key)
-		/**
-		 * @return {Uint8Array} `null` if there are no items
-		 */
-		last_key : ->
-			@_last_key
 	Object.defineProperty(State_cache::, 'constructor', {value: State_cache})
 	/**
 	 * @constructor
