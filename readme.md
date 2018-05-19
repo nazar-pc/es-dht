@@ -75,6 +75,11 @@ Get specified (or latest if not specified explicitly) state of the node.
 
 Returns `[state_version, proof, peers]` or `null` if state version not found, where `state_version` is a Merkle Tree root, `proof` is a proof that own ID corresponds to `state_version` and `peers` is an array of peers IDs.
 
+### es_dht.commit_state()
+Commit current state into state history, needs to be called if current state was sent to any peer.
+
+This allows to only store useful state versions in cache known to other peers and discard the rest.
+
 ### es_dht.set_peer(peer_id : Uint8Array, peer_state_version : Uint8Array, proof : Uint8Array, peer_peers : Uint8Array[]) : boolean
 Add or update peer with latest state version, proof for state version and peers.
 

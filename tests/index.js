@@ -28,6 +28,7 @@
     this._data = ArrayMap();
     if (bootstrap_node_id) {
       state = this._request(bootstrap_node_id, 'bootstrap', this._dht.get_state());
+      this._dht.commit_state();
       if (state) {
         state_version = state[0], proof = state[1], peers = state[2];
         this._dht.set_peer(bootstrap_node_id, state_version, proof, peers);
@@ -104,7 +105,7 @@
       switch (command) {
       case 'bootstrap':
         state_version = data[0], proof = data[1], peers = data[2];
-        return this._dht.set_peer(source_id, state_version, proof, peers) ? this._dht.get_state() : null;
+        return this._dht.set_peer(source_id, state_version, proof, peers) ? (this._dht.commit_state(), this._dht.get_state()) : null;
       case 'get':
         return this._data.get(data) || null;
       case 'put':

@@ -95,7 +95,8 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		@_hash								= hash_function
 		@_bucket_size						= bucket_size
 		@_fraction_of_nodes_from_same_peer	= fraction_of_nodes_from_same_peer
-		@_state								= State_cache(state_history_size)
+		@_state_cache						= State_cache(state_history_size)
+		@_latest_state						= []
 		@_peers								= k-bucket-sync(@_id, bucket_size)
 		# Lookups that are in progress
 		@_lookups							= ArrayMap()
@@ -113,7 +114,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 				return []
 			bucket		= k-bucket-sync(id, number)
 			parents		= ArrayMap()
-			state		= @_get_state()
+			state		= @_get_state()[1]
 			state.forEach ([state_version, peer_peers], peer_id) !->
 				bucket['set'](peer_id)
 				for peer_peer_id in peer_peers
@@ -264,30 +265,42 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 *                 that own ID corresponds to `state_version` and `peers` is an array of peers IDs
 		 */
 		'get_state' : (state_version = null) ->
-			state_version	= state_version || @_state.last_key()
-			state			= @_get_state(state_version)
-			if !state
+			result					= @_get_state(state_version)
+			if !result
 				return null
+			[state_version, state]	= result
 			# Get proof that own ID is in this state version
-			proof	= @'get_state_proof'(state_version, @_id)
+			proof					= @'get_state_proof'(state_version, @_id)
 			[state_version, proof, Array.from(state.keys())]
+		/**
+		 * Commit current state into state history, needs to be called if current state was sent to any peer.
+		 *
+		 * This allows to only store useful state versions in cache known to other peers and discard the rest.
+		 */
+		'commit_state' : !->
+			[state_version, state]	= @_latest_state
+			@_state_cache.add(state_version, state)
 		/**
 		 * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
 		 *
-		 * @return {Map} `null` if state is not found
+		 * @return {Array} `[state_version, state]` or `null` if state is not found
 		 */
 		_get_state : (state_version = null) ->
-			state_version	= state_version || @_state.last_key()
-			if !state_version
-				return null
-			@_state.get(state_version)
+			if !state_version || are_arrays_equal(state_version, @_latest_state[0])
+				@_latest_state
+			else
+				state	= @_state_cache.get(state_version)
+				if state
+					[state_version, state]
+				else
+					null
 		/**
 		 * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
 		 *
 		 * @return {Map}
 		 */
 		_get_state_copy : (state_version = null) ->
-			state	= @_get_state(state_version)
+			state	= @_get_state(state_version)?[1]
 			if !state
 				return null
 			ArrayMap(Array.from(state))
@@ -300,7 +313,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @return {!Uint8Array}
 		 */
 		'get_state_proof' : (state_version, peer_id) ->
-			state	= @_get_state(state_version)
+			state	= @_get_state(state_version)?[1]
 			if !state || (!state.has(peer_id) && !are_arrays_equal(peer_id, @_id))
 				new Uint8Array(0)
 			else
@@ -339,7 +352,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		_insert_state : (new_state) !->
 			items			= @_reduce_state_to_proof_items(new_state)
 			state_version	= merkle-tree-binary['get_root'](items, @_hash)
-			@_state.add(state_version, new_state)
+			@_latest_state	= [state_version, new_state]
 	Object.defineProperty(DHT::, 'constructor', {value: DHT})
 
 	DHT

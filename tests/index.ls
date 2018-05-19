@@ -25,6 +25,7 @@ instances	= ArrayMap()
 	@_data	= ArrayMap()
 	if bootstrap_node_id
 		state	= @_request(bootstrap_node_id, 'bootstrap', @_dht.get_state())
+		@_dht.commit_state()
 		if state
 			[state_version, proof, peers]	= state
 			@_dht.set_peer(bootstrap_node_id, state_version, proof, peers)
@@ -78,6 +79,7 @@ Simple_DHT:: =
 				[state_version, proof, peers] = data
 				return
 					if @_dht.set_peer(source_id, state_version, proof, peers)
+						@_dht.commit_state()
 						@_dht.get_state()
 					else
 						null

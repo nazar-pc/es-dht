@@ -118,7 +118,8 @@
       this._hash = hash_function;
       this._bucket_size = bucket_size;
       this._fraction_of_nodes_from_same_peer = fraction_of_nodes_from_same_peer;
-      this._state = State_cache(state_history_size);
+      this._state_cache = State_cache(state_history_size);
+      this._latest_state = [];
       this._peers = kBucketSync(this._id, bucket_size);
       this._lookups = ArrayMap();
       this._insert_state(new Map);
@@ -138,7 +139,7 @@
         }
         bucket = kBucketSync(id, number);
         parents = ArrayMap();
-        state = this._get_state();
+        state = this._get_state()[1];
         state.forEach(function(arg$, peer_id){
           var state_version, peer_peers, i$, len$, peer_peer_id;
           state_version = arg$[0], peer_peers = arg$[1];
@@ -319,28 +320,44 @@
        *                 that own ID corresponds to `state_version` and `peers` is an array of peers IDs
        */,
       'get_state': function(state_version){
-        var state, proof;
+        var result, state, proof;
         state_version == null && (state_version = null);
-        state_version = state_version || this._state.last_key();
-        state = this._get_state(state_version);
-        if (!state) {
+        result = this._get_state(state_version);
+        if (!result) {
           return null;
         }
+        state_version = result[0], state = result[1];
         proof = this['get_state_proof'](state_version, this._id);
         return [state_version, proof, Array.from(state.keys())];
       }
       /**
+       * Commit current state into state history, needs to be called if current state was sent to any peer.
+       *
+       * This allows to only store useful state versions in cache known to other peers and discard the rest.
+       */,
+      'commit_state': function(){
+        var ref$, state_version, state;
+        ref$ = this._latest_state, state_version = ref$[0], state = ref$[1];
+        this._state_cache.add(state_version, state);
+      }
+      /**
        * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
        *
-       * @return {Map} `null` if state is not found
+       * @return {Array} `[state_version, state]` or `null` if state is not found
        */,
       _get_state: function(state_version){
+        var state;
         state_version == null && (state_version = null);
-        state_version = state_version || this._state.last_key();
-        if (!state_version) {
-          return null;
+        if (!state_version || are_arrays_equal(state_version, this._latest_state[0])) {
+          return this._latest_state;
+        } else {
+          state = this._state_cache.get(state_version);
+          if (state) {
+            return [state_version, state];
+          } else {
+            return null;
+          }
         }
-        return this._state.get(state_version);
       }
       /**
        * @param {Uint8Array=}	state_version	Specific state version or latest if `null`
@@ -348,9 +365,9 @@
        * @return {Map}
        */,
       _get_state_copy: function(state_version){
-        var state;
+        var state, ref$;
         state_version == null && (state_version = null);
-        state = this._get_state(state_version);
+        state = (ref$ = this._get_state(state_version)) != null ? ref$[1] : void 8;
         if (!state) {
           return null;
         }
@@ -365,8 +382,8 @@
        * @return {!Uint8Array}
        */,
       'get_state_proof': function(state_version, peer_id){
-        var state, items;
-        state = this._get_state(state_version);
+        var state, ref$, items;
+        state = (ref$ = this._get_state(state_version)) != null ? ref$[1] : void 8;
         if (!state || (!state.has(peer_id) && !are_arrays_equal(peer_id, this._id))) {
           return new Uint8Array(0);
         } else {
@@ -413,7 +430,7 @@
         var items, state_version;
         items = this._reduce_state_to_proof_items(new_state);
         state_version = merkleTreeBinary['get_root'](items, this._hash);
-        this._state.add(state_version, new_state);
+        this._latest_state = [state_version, new_state];
       }
     };
     Object.defineProperty(DHT.prototype, 'constructor', {
