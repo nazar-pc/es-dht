@@ -205,15 +205,12 @@
           return [];
         }
         bucket = lookup[0], number = lookup[1], already_connected = lookup[2];
-        already_connected.add(node_id);
-        if (this._peers['has'](id)) {
-          return [];
-        }
-        if (bucket['has'](id)) {
-          return [];
-        }
         if (!node_peers) {
           bucket['del'](node_id);
+          return [];
+        }
+        already_connected.add(node_id);
+        if (this._peers['has'](id) || bucket['has'](id)) {
           return [];
         }
         added_nodes = ArraySet();

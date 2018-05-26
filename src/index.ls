@@ -169,13 +169,11 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			if !lookup
 				return []
 			[bucket, number, already_connected]	= lookup
-			already_connected.add(node_id)
-			if @_peers['has'](id)
-				return []
-			if bucket['has'](id)
-				return []
 			if !node_peers
 				bucket['del'](node_id)
+				return []
+			already_connected.add(node_id)
+			if @_peers['has'](id) || bucket['has'](id)
 				return []
 			added_nodes	= ArraySet()
 			for node_peer_id in node_peers
