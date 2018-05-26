@@ -124,7 +124,7 @@
        * @return {!Array<!Array<!Uint8Array>>} Array of items, each item is an array of `Uint8Array`s `[node_id, parent_peer_id, parent_peer_state_version]`
        */
       'start_lookup': function(id, number){
-        var bucket, parents, state, parent_peer_id, parent_peer_state_version, max_fraction, current_number, closest_so_far, closest_nodes_found, max_count_allowed, nodes_to_connect_to, originated_from, retry, i$, len$, closest_node_id, count;
+        var bucket, parents, state, already_connected, parent_peer_id, parent_peer_state_version, nodes_to_connect_to, max_fraction, current_number, closest_so_far, closest_nodes_found, max_count_allowed, originated_from, retry, i$, len$, closest_node_id, count;
         number == null && (number = this._bucket_size);
         if (this._peers['has'](id)) {
           return [];
@@ -132,9 +132,11 @@
         bucket = kBucketSync(id, number);
         parents = ArrayMap();
         state = this._get_state()[1];
+        already_connected = ArraySet();
         state.forEach(function(arg$, peer_id){
           var state_version, peer_peers, i$, len$, peer_peer_id;
           state_version = arg$[0], peer_peers = arg$[1];
+          already_connected.add(peer_id);
           bucket['set'](peer_id);
           for (i$ = 0, len$ = peer_peers.length; i$ < len$; ++i$) {
             peer_peer_id = peer_peers[i$];
@@ -144,48 +146,48 @@
           }
         });
         if (bucket['has'](id)) {
-          this._lookups.set(id, [bucket, number]);
           parent_peer_id = parents.get(id);
           parent_peer_state_version = state.get(parent_peer_id)[0];
-          return [[id, parent_peer_id, parent_peer_state_version]];
-        }
-        bucket['del'](this._id);
-        max_fraction = Math.max(this._fraction_of_nodes_from_same_peer, 1 / this._peers['count']());
-        current_number = number;
-        for (;;) {
-          closest_so_far = bucket['closest'](id, number);
-          closest_nodes_found = closest_so_far.length;
-          max_count_allowed = Math.ceil(closest_nodes_found * max_fraction);
-          nodes_to_connect_to = [];
-          originated_from = ArrayMap();
-          retry = false;
-          for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
-            closest_node_id = closest_so_far[i$];
-            parent_peer_id = parents.get(closest_node_id);
-            if (parent_peer_id) {
-              count = originated_from.get(parent_peer_id) || 0;
-              originated_from.set(parent_peer_id, count + 1);
-              if (count > max_count_allowed) {
-                bucket['del'](closest_node_id);
-                retry = true;
+          nodes_to_connect_to = [[id, parent_peer_id, parent_peer_state_version]];
+        } else {
+          bucket['del'](this._id);
+          max_fraction = Math.max(this._fraction_of_nodes_from_same_peer, 1 / this._peers['count']());
+          current_number = number;
+          for (;;) {
+            closest_so_far = bucket['closest'](id, number);
+            closest_nodes_found = closest_so_far.length;
+            max_count_allowed = Math.ceil(closest_nodes_found * max_fraction);
+            nodes_to_connect_to = [];
+            originated_from = ArrayMap();
+            retry = false;
+            for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
+              closest_node_id = closest_so_far[i$];
+              parent_peer_id = parents.get(closest_node_id);
+              if (parent_peer_id) {
+                count = originated_from.get(parent_peer_id) || 0;
+                originated_from.set(parent_peer_id, count + 1);
+                if (count > max_count_allowed) {
+                  bucket['del'](closest_node_id);
+                  retry = true;
+                } else {
+                  parent_peer_state_version = state.get(parent_peer_id)[0];
+                  nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version]);
+                }
               } else {
-                parent_peer_state_version = state.get(parent_peer_id)[0];
-                nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version]);
-              }
-            } else {
-              count = originated_from.get(closest_node_id) || 0;
-              originated_from.set(closest_node_id, count + 1);
-              if (count > max_count_allowed) {
-                bucket['del'](closest_node_id);
-                retry = true;
+                count = originated_from.get(closest_node_id) || 0;
+                originated_from.set(closest_node_id, count + 1);
+                if (count > max_count_allowed) {
+                  bucket['del'](closest_node_id);
+                  retry = true;
+                }
               }
             }
-          }
-          if (!retry) {
-            break;
+            if (!retry) {
+              break;
+            }
           }
         }
-        this._lookups.set(id, [bucket, number]);
+        this._lookups.set(id, [bucket, number, already_connected]);
         return nodes_to_connect_to;
       }
       /**
@@ -197,15 +199,16 @@
        * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
        */,
       'update_lookup': function(id, node_id, node_state_version, node_peers){
-        var lookup, bucket, number, added_nodes, i$, len$, node_peer_id, closest_so_far, nodes_to_connect_to, closest_node_id;
-        if (this._peers['has'](id)) {
-          return [];
-        }
+        var lookup, bucket, number, already_connected, added_nodes, i$, len$, node_peer_id, closest_so_far, nodes_to_connect_to, closest_node_id;
         lookup = this._lookups.get(id);
         if (!lookup) {
           return [];
         }
-        bucket = lookup[0], number = lookup[1];
+        bucket = lookup[0], number = lookup[1], already_connected = lookup[2];
+        already_connected.add(node_id);
+        if (this._peers['has'](id)) {
+          return [];
+        }
         if (bucket['has'](id)) {
           return [];
         }
@@ -240,16 +243,16 @@
        * @return {Array<!Uint8Array>} `[id]` if node with specified ID was connected directly, an array of closest IDs if exact node wasn't found and `null` otherwise
        */,
       'finish_lookup': function(id){
-        var lookup, bucket, number;
+        var lookup, bucket, number, already_connected;
         lookup = this._lookups.get(id);
         this._lookups['delete'](id);
-        if (this._peers['has'](id)) {
-          return [id];
-        }
         if (!lookup) {
           return null;
         }
-        bucket = lookup[0], number = lookup[1];
+        bucket = lookup[0], number = lookup[1], already_connected = lookup[2];
+        if (this._peers['has'](id) || already_connected.has(id)) {
+          return [id];
+        }
         return bucket['closest'](id, number);
       }
       /**

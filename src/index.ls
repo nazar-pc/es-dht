@@ -105,54 +105,56 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		'start_lookup' : (id, number = @_bucket_size) ->
 			if @_peers['has'](id)
 				return []
-			bucket		= k-bucket-sync(id, number)
-			parents		= ArrayMap()
-			state		= @_get_state()[1]
+			bucket				= k-bucket-sync(id, number)
+			parents				= ArrayMap()
+			state				= @_get_state()[1]
+			already_connected	= ArraySet()
 			state.forEach ([state_version, peer_peers], peer_id) !->
+				already_connected.add(peer_id)
 				bucket['set'](peer_id)
 				for peer_peer_id in peer_peers
 					if !parents.has(peer_peer_id) && bucket['set'](peer_peer_id)
 						parents.set(peer_peer_id, peer_id)
 			# If ID is known by one of our peers - not need for further work
 			if bucket['has'](id)
-				@_lookups.set(id, [bucket, number])
 				parent_peer_id				= parents.get(id)
 				parent_peer_state_version	= state.get(parent_peer_id)[0]
-				return [[id, parent_peer_id, parent_peer_state_version]]
-			# Delete own ID from k-bucket, since we start from our node
-			bucket['del'](@_id)
-			max_fraction	= Math.max(@_fraction_of_nodes_from_same_peer, 1 / @_peers['count']())
-			current_number	= number
-			# On the first round of lookup we only allow some fraction of closest nodes to originate from the same peer
-			loop
-				closest_so_far		= bucket['closest'](id, number)
-				closest_nodes_found	= closest_so_far.length
-				max_count_allowed	= Math.ceil(closest_nodes_found * max_fraction)
-				nodes_to_connect_to	= []
-				originated_from		= ArrayMap()
-				retry				= false
-				for closest_node_id in closest_so_far
-					parent_peer_id	= parents.get(closest_node_id)
-					if parent_peer_id
-						count	= originated_from.get(parent_peer_id) || 0
-						originated_from.set(parent_peer_id, count + 1)
-						if count > max_count_allowed
-							# This node should be discarded, since it exceeds quota for number of nodes originated from the same peer
-							bucket['del'](closest_node_id)
-							retry	= true
+				nodes_to_connect_to			= [[id, parent_peer_id, parent_peer_state_version]]
+			else
+				# Delete own ID from k-bucket, since we start from our node
+				bucket['del'](@_id)
+				max_fraction	= Math.max(@_fraction_of_nodes_from_same_peer, 1 / @_peers['count']())
+				current_number	= number
+				# On the first round of lookup we only allow some fraction of closest nodes to originate from the same peer
+				loop
+					closest_so_far		= bucket['closest'](id, number)
+					closest_nodes_found	= closest_so_far.length
+					max_count_allowed	= Math.ceil(closest_nodes_found * max_fraction)
+					nodes_to_connect_to	= []
+					originated_from		= ArrayMap()
+					retry				= false
+					for closest_node_id in closest_so_far
+						parent_peer_id	= parents.get(closest_node_id)
+						if parent_peer_id
+							count	= originated_from.get(parent_peer_id) || 0
+							originated_from.set(parent_peer_id, count + 1)
+							if count > max_count_allowed
+								# This node should be discarded, since it exceeds quota for number of nodes originated from the same peer
+								bucket['del'](closest_node_id)
+								retry	= true
+							else
+								parent_peer_state_version	= state.get(parent_peer_id)[0]
+								nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version])
 						else
-							parent_peer_state_version	= state.get(parent_peer_id)[0]
-							nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version])
-					else
-						count	= originated_from.get(closest_node_id) || 0
-						originated_from.set(closest_node_id, count + 1)
-						if count > max_count_allowed
-							# This node should be discarded, since it exceeds quota for number of nodes originated from the same peer
-							bucket['del'](closest_node_id)
-							retry	= true
-				if !retry
-					break
-			@_lookups.set(id, [bucket, number])
+							count	= originated_from.get(closest_node_id) || 0
+							originated_from.set(closest_node_id, count + 1)
+							if count > max_count_allowed
+								# This node should be discarded, since it exceeds quota for number of nodes originated from the same peer
+								bucket['del'](closest_node_id)
+								retry	= true
+					if !retry
+						break
+			@_lookups.set(id, [bucket, number, already_connected])
 			nodes_to_connect_to
 		/**
 		 * @param {!Uint8Array}			id					The same as in `start_lookup()`
@@ -163,12 +165,13 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
 		 */
 		'update_lookup' : (id, node_id, node_state_version, node_peers) ->
-			if @_peers['has'](id)
-				return []
 			lookup	= @_lookups.get(id)
 			if !lookup
 				return []
-			[bucket, number]	= lookup
+			[bucket, number, already_connected]	= lookup
+			already_connected.add(node_id)
+			if @_peers['has'](id)
+				return []
 			if bucket['has'](id)
 				return []
 			if !node_peers
@@ -197,11 +200,11 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		'finish_lookup' : (id) ->
 			lookup	= @_lookups.get(id)
 			@_lookups.delete(id)
-			if @_peers['has'](id)
-				return [id]
 			if !lookup
 				return null
-			[bucket, number]	= lookup
+			[bucket, number, already_connected]	= lookup
+			if @_peers['has'](id) || already_connected.has(id)
+				return [id]
 			bucket['closest'](id, number)
 		/**
 		 * @param {!Uint8Array}			peer_id				Id of a peer
