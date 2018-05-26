@@ -124,7 +124,7 @@
        * @return {!Array<!Array<!Uint8Array>>} Array of items, each item is an array of `Uint8Array`s `[node_id, parent_peer_id, parent_peer_state_version]`
        */
       'start_lookup': function(id, number){
-        var bucket, parents, state, max_fraction, current_number, closest_so_far, closest_nodes_found, max_count_allowed, nodes_to_connect_to, connections_awaiting, originated_from, retry, i$, len$, closest_node_id, parent_peer_id, count, parent_peer_state_version;
+        var bucket, parents, state, parent_peer_id, parent_peer_state_version, max_fraction, current_number, closest_so_far, closest_nodes_found, max_count_allowed, nodes_to_connect_to, originated_from, retry, i$, len$, closest_node_id, count;
         number == null && (number = this._bucket_size);
         if (this._peers['has'](id)) {
           return [];
@@ -143,6 +143,12 @@
             }
           }
         });
+        if (bucket['has'](id)) {
+          this._lookups.set(id, [bucket, number]);
+          parent_peer_id = parents.get(id);
+          parent_peer_state_version = state.get(parent_peer_id)[0];
+          return [[id, parent_peer_id, parent_peer_state_version]];
+        }
         bucket['del'](this._id);
         max_fraction = Math.max(this._fraction_of_nodes_from_same_peer, 1 / this._peers['count']());
         current_number = number;
@@ -151,7 +157,6 @@
           closest_nodes_found = closest_so_far.length;
           max_count_allowed = Math.ceil(closest_nodes_found * max_fraction);
           nodes_to_connect_to = [];
-          connections_awaiting = ArraySet();
           originated_from = ArrayMap();
           retry = false;
           for (i$ = 0, len$ = closest_so_far.length; i$ < len$; ++i$) {
@@ -166,7 +171,6 @@
               } else {
                 parent_peer_state_version = state.get(parent_peer_id)[0];
                 nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version]);
-                connections_awaiting.add(closest_node_id);
               }
             } else {
               count = originated_from.get(closest_node_id) || 0;
@@ -181,7 +185,7 @@
             break;
           }
         }
-        this._lookups.set(id, [connections_awaiting, bucket, number]);
+        this._lookups.set(id, [bucket, number]);
         return nodes_to_connect_to;
       }
       /**
@@ -193,13 +197,18 @@
        * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
        */,
       'update_lookup': function(id, node_id, node_state_version, node_peers){
-        var lookup, connections_awaiting, bucket, number, added_nodes, i$, len$, node_peer_id, closest_so_far, nodes_to_connect_to, closest_node_id;
+        var lookup, bucket, number, added_nodes, i$, len$, node_peer_id, closest_so_far, nodes_to_connect_to, closest_node_id;
+        if (this._peers['has'](id)) {
+          return [];
+        }
         lookup = this._lookups.get(id);
         if (!lookup) {
           return [];
         }
-        connections_awaiting = lookup[0], bucket = lookup[1], number = lookup[2];
-        connections_awaiting['delete'](node_id);
+        bucket = lookup[0], number = lookup[1];
+        if (bucket['has'](id)) {
+          return [];
+        }
         if (!node_peers) {
           bucket['del'](node_id);
           return [];
@@ -211,6 +220,9 @@
             added_nodes.add(node_peer_id);
           }
         }
+        if (bucket['has'](id)) {
+          return [[id, node_id, node_state_version]];
+        }
         bucket['del'](this._id);
         closest_so_far = bucket['closest'](id, number);
         nodes_to_connect_to = [];
@@ -218,7 +230,6 @@
           closest_node_id = closest_so_far[i$];
           if (added_nodes.has(closest_node_id)) {
             nodes_to_connect_to.push([closest_node_id, node_id, node_state_version]);
-            connections_awaiting.add(closest_node_id);
           }
         }
         return nodes_to_connect_to;
@@ -238,7 +249,7 @@
         if (!lookup) {
           return null;
         }
-        bucket = lookup[1], number = lookup[2];
+        bucket = lookup[0], number = lookup[1];
         return bucket['closest'](id, number);
       }
       /**

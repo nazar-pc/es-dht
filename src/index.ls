@@ -113,19 +113,24 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 				for peer_peer_id in peer_peers
 					if !parents.has(peer_peer_id) && bucket['set'](peer_peer_id)
 						parents.set(peer_peer_id, peer_id)
+			# If ID is known by one of our peers - not need for further work
+			if bucket['has'](id)
+				@_lookups.set(id, [bucket, number])
+				parent_peer_id				= parents.get(id)
+				parent_peer_state_version	= state.get(parent_peer_id)[0]
+				return [[id, parent_peer_id, parent_peer_state_version]]
 			# Delete own ID from k-bucket, since we start from our node
 			bucket['del'](@_id)
 			max_fraction	= Math.max(@_fraction_of_nodes_from_same_peer, 1 / @_peers['count']())
 			current_number	= number
 			# On the first round of lookup we only allow some fraction of closest nodes to originate from the same peer
 			loop
-				closest_so_far			= bucket['closest'](id, number)
-				closest_nodes_found		= closest_so_far.length
-				max_count_allowed		= Math.ceil(closest_nodes_found * max_fraction)
-				nodes_to_connect_to		= []
-				connections_awaiting	= ArraySet()
-				originated_from			= ArrayMap()
-				retry					= false
+				closest_so_far		= bucket['closest'](id, number)
+				closest_nodes_found	= closest_so_far.length
+				max_count_allowed	= Math.ceil(closest_nodes_found * max_fraction)
+				nodes_to_connect_to	= []
+				originated_from		= ArrayMap()
+				retry				= false
 				for closest_node_id in closest_so_far
 					parent_peer_id	= parents.get(closest_node_id)
 					if parent_peer_id
@@ -138,7 +143,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 						else
 							parent_peer_state_version	= state.get(parent_peer_id)[0]
 							nodes_to_connect_to.push([closest_node_id, parent_peer_id, parent_peer_state_version])
-							connections_awaiting.add(closest_node_id)
 					else
 						count	= originated_from.get(closest_node_id) || 0
 						originated_from.set(closest_node_id, count + 1)
@@ -148,7 +152,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 							retry	= true
 				if !retry
 					break
-			@_lookups.set(id, [connections_awaiting, bucket, number])
+			@_lookups.set(id, [bucket, number])
 			nodes_to_connect_to
 		/**
 		 * @param {!Uint8Array}			id					The same as in `start_lookup()`
@@ -159,11 +163,14 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 		 * @return {!Array<!Array<!Uint8Array>>} The same as in `start_lookup()`
 		 */
 		'update_lookup' : (id, node_id, node_state_version, node_peers) ->
+			if @_peers['has'](id)
+				return []
 			lookup	= @_lookups.get(id)
 			if !lookup
 				return []
-			[connections_awaiting, bucket, number]	= lookup
-			connections_awaiting.delete(node_id)
+			[bucket, number]	= lookup
+			if bucket['has'](id)
+				return []
 			if !node_peers
 				bucket['del'](node_id)
 				return []
@@ -171,6 +178,9 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			for node_peer_id in node_peers
 				if !bucket['has'](node_peer_id) && bucket['set'](node_peer_id)
 					added_nodes.add(node_peer_id)
+			# If ID is known by one of our peers - not need for further work
+			if bucket['has'](id)
+				return [[id, node_id, node_state_version]]
 			# Delete own ID from k-bucket, since we start from our node
 			bucket['del'](@_id)
 			closest_so_far		= bucket['closest'](id, number)
@@ -178,7 +188,6 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 			for closest_node_id in closest_so_far
 				if added_nodes.has(closest_node_id)
 					nodes_to_connect_to.push([closest_node_id, node_id, node_state_version])
-					connections_awaiting.add(closest_node_id)
 			nodes_to_connect_to
 		/**
 		 * @param {!Uint8Array} id The same as in `start_lookup()`
@@ -192,7 +201,7 @@ function Wrapper (array-map-set, k-bucket-sync, merkle-tree-binary)
 				return [id]
 			if !lookup
 				return null
-			[, bucket, number]	= lookup
+			[bucket, number]	= lookup
 			bucket['closest'](id, number)
 		/**
 		 * @param {!Uint8Array}			peer_id				Id of a peer
