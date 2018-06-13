@@ -10,12 +10,14 @@ Entangled state DHT framework is intended to be practical and robust DHT framewo
 ES-DHT facilitates lookups over immutable snapshot of the whole or at least large part of DHT while only knowing a small part of all nodes.
 This is achieved using Merkle Trees on each node that are recursively dependant on all of its peers, so that the whole network is interdependent and active adversary can't insert nodes into lookup process once lookup is started (which happens locally).
 
-ES-DHT is not a full DHT implementation, but rather an important piece. ES-DHT also doesn't aim to protect against global passive adversary or other active attacks, defences against which can be implemented by simply changing ES-DHT.
+ES-DHT is not a full DHT implementation, but rather an important piece. ES-DHT also doesn't aim to protect against global passive adversary or other active attacks, defences against which can be implemented without changes to ES-DHT.
 
 ## Current status
-MVP, nothing is stable yet, but it kind of works.
+Specification and design are not finalized yet, but seem good already.
 
-Not recommended for anything other than experiments.
+Implementation API should be near stable and unlikely to change unless major spec changes are needed.
+
+Still considered unstable, so be careful and make sure to report any issues you encounter. Project is covered with tests though to ensure it works as intended (see `tests` directory).
 
 ## How to install
 ```
