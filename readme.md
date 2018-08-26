@@ -41,10 +41,11 @@ requirejs(['es-dht'], function (es_dht) {
 ## Implementation API
 Implementation is fully synchronous, which makes it easier to reason about and test.
 
-### es_dht(id : Uint8Array, bucket_size : number, state_history_size : number, fraction_of_nodes_from_same_peer = 0.2 : number) : es_dht
+### es_dht(id : Uint8Array, hash_function : Function, bucket_size : number, state_history_size : number, fraction_of_nodes_from_same_peer = 0.2 : number) : es_dht
 Constructor, creates ES-DHT instance.
 
 * `id` - Local ID (likely public key or something derived from it)
+* `hash_function` - Hash function to be used for Merkle Tree
 * `bucket_size` - Size of a bucket in internal k-bucket implementation
 * `state_history_size` - How many history items will be kept in memory before removing older ones
 * `fraction_of_nodes_from_same_peer` - what fraction of nodes can be originated from the same peer on lookup start
